@@ -1,0 +1,363 @@
+<!-- Stats page -->
+<div class="flex items-center justify-between mb-8">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900">Stats</h1>
+    <p class="text-sm text-gray-500 mt-1">How your job search is performing</p>
+  </div>
+</div>
+
+<!-- ── Overall numbers ── -->
+<div class="grid grid-cols-3 gap-4 mb-6">
+  <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 text-center">
+    <div class="text-3xl font-black text-blue-600"><%= totals.applied %></div>
+    <div class="text-xs text-gray-500 mt-1 font-medium">Applied</div>
+    <div class="text-xs text-gray-400 mt-0.5"><%= totals.strong > 0 ? Math.round(totals.applied / totals.strong * 100) : 0 %>% of strong matches</div>
+  </div>
+  <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 text-center">
+    <div class="text-3xl font-black text-gray-800"><%= totals.strong %></div>
+    <div class="text-xs text-gray-500 mt-1 font-medium">Strong Matches</div>
+    <div class="text-xs text-gray-400 mt-0.5">total found</div>
+  </div>
+  <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 text-center">
+    <div class="text-3xl font-black text-gray-400"><%= totals.total %></div>
+    <div class="text-xs text-gray-500 mt-1 font-medium">Total Jobs Saved</div>
+    <div class="text-xs text-gray-400 mt-0.5">all verdicts</div>
+  </div>
+</div>
+
+<!-- ── Status Breakdown ── -->
+<% if (totals.total > 0) { %>
+<%
+  const STATUS_CONFIG = {
+    STRONG_MATCH: { label: 'Strong Match', bar: '#10b981', dot: 'bg-emerald-500', text: 'text-emerald-700' },
+    WEAK_MATCH:   { label: 'Weak Match',   bar: '#f59e0b', dot: 'bg-amber-400',   text: 'text-amber-700' },
+    NO_MATCH:     { label: 'No Match',     bar: '#f87171', dot: 'bg-red-400',     text: 'text-red-600' },
+    DUPLICATE:    { label: 'Duplicate',    bar: '#c084fc', dot: 'bg-purple-400',  text: 'text-purple-700' },
+    BLACKLISTED:  { label: 'Blacklisted',  bar: '#9ca3af', dot: 'bg-gray-400',    text: 'text-gray-500' },
+    UNKNOWN:      { label: 'Unknown',      bar: '#d1d5db', dot: 'bg-gray-300',    text: 'text-gray-400' },
+  };
+  const STATUS_ORDER = ['STRONG_MATCH', 'WEAK_MATCH', 'NO_MATCH', 'DUPLICATE', 'BLACKLISTED'];
+  const sbMap = {};
+  statusBreakdown.forEach(s => { sbMap[s.status] = s.count; });
+  const orderedBreakdown = STATUS_ORDER.filter(k => sbMap[k]).map(k => ({ status: k, count: sbMap[k] }));
+  statusBreakdown.forEach(s => { if (!STATUS_ORDER.includes(s.status) && s.count > 0) orderedBreakdown.push(s); });
+  const totalCount = orderedBreakdown.reduce((a, s) => a + s.count, 0) || 1;
+%>
+<div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
+  <h2 class="font-semibold text-gray-900 text-sm mb-4">All Results by Status</h2>
+  <!-- Stacked proportional bar -->
+  <div class="flex rounded-lg overflow-hidden h-9 mb-4 gap-px">
+    <% orderedBreakdown.forEach(s => {
+       const cfg = STATUS_CONFIG[s.status] || { label: s.status, bar: '#d1d5db', dot: 'bg-gray-300', text: 'text-gray-500' };
+       const pct = Math.round(s.count / totalCount * 100);
+    %>
+    <% if (pct > 0) { %>
+    <div class="flex items-center justify-center text-white text-xs font-semibold"
+         style="width:<%= pct %>%;background:<%= cfg.bar %>;"
+         title="<%= cfg.label %>: <%= s.count %> (<%= pct %>%)">
+      <% if (pct >= 8) { %><%= pct %>%<% } %>
+    </div>
+    <% } %>
+    <% }); %>
+  </div>
+  <!-- Legend -->
+  <div class="flex flex-wrap gap-x-5 gap-y-2">
+    <% orderedBreakdown.forEach(s => {
+       const cfg = STATUS_CONFIG[s.status] || { label: s.status, bar: '#d1d5db', dot: 'bg-gray-300', text: 'text-gray-500' };
+    %>
+    <div class="flex items-center gap-2">
+      <div class="w-3 h-3 rounded-sm flex-shrink-0 <%= cfg.dot %>"></div>
+      <span class="text-xs text-gray-500"><%= cfg.label %>: <span class="font-semibold <%= cfg.text %>"><%= s.count %></span></span>
+    </div>
+    <% }); %>
+  </div>
+</div>
+<% } %>
+
+<!-- ── By Role + By Country ── -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+
+  <!-- By Role -->
+  <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-100">
+      <h2 class="font-semibold text-gray-900 text-sm">By Role</h2>
+      <p class="text-xs text-gray-400 mt-0.5">Strong matches found and applied per role</p>
+    </div>
+    <% if (groupStats.length === 0) { %>
+    <div class="px-6 py-10 text-center text-sm text-gray-400">No roles yet.</div>
+    <% } else { %>
+    <table class="w-full">
+      <thead>
+        <tr class="border-b border-gray-100 bg-gray-50">
+          <th class="px-5 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
+          <th class="px-3 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Found</th>
+          <th class="px-3 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Strong</th>
+          <th class="px-3 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Applied</th>
+          <th class="px-5 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Rate</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        <% groupStats.forEach(g => { %>
+        <tr class="hover:bg-gray-50 transition-colors">
+          <td class="px-5 py-3.5 text-sm font-medium text-gray-800"><%= g.name %></td>
+          <td class="px-3 py-3.5 text-center text-sm text-gray-500"><%= g.total %></td>
+          <td class="px-3 py-3.5 text-center">
+            <span class="text-sm font-semibold text-emerald-600"><%= g.strong %></span>
+          </td>
+          <td class="px-3 py-3.5 text-center">
+            <span class="text-sm font-semibold text-blue-600"><%= g.applied %></span>
+          </td>
+          <td class="px-5 py-3.5 text-center">
+            <% const rate = g.strong > 0 ? Math.round(g.applied / g.strong * 100) : 0; %>
+            <div class="inline-flex items-center gap-2">
+              <div class="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div class="h-full bg-blue-500 rounded-full" style="width:<%= rate %>%"></div>
+              </div>
+              <span class="text-xs text-gray-500 font-medium w-7 text-right"><%= rate %>%</span>
+            </div>
+          </td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+    <% } %>
+  </div>
+
+  <!-- By Country -->
+  <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-100">
+      <h2 class="font-semibold text-gray-900 text-sm">By Country</h2>
+      <p class="text-xs text-gray-400 mt-0.5">Where strong matches are located</p>
+    </div>
+    <% if (countryStats.length === 0) { %>
+    <div class="px-6 py-10 text-center text-sm text-gray-400">No data yet.</div>
+    <% } else { %>
+    <%
+      const maxCountryStrong = countryStats[0] ? countryStats[0].strong : 1;
+    %>
+    <ul class="divide-y divide-gray-50 px-5 py-2">
+      <% countryStats.slice(0, 15).forEach(c => { %>
+      <li class="py-3 flex items-center gap-3">
+        <span class="text-sm text-gray-700 w-32 flex-shrink-0 truncate"><%= c.country %></span>
+        <div class="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+          <div class="h-full bg-emerald-400 rounded-full" style="width:<%= Math.round(c.strong / maxCountryStrong * 100) %>%"></div>
+        </div>
+        <span class="text-sm font-semibold text-gray-700 w-6 text-right flex-shrink-0"><%= c.strong %></span>
+        <% if (c.applied > 0) { %>
+        <span class="text-xs text-blue-600 font-medium w-16 text-right flex-shrink-0"><%= c.applied %> applied</span>
+        <% } else { %>
+        <span class="w-16 flex-shrink-0"></span>
+        <% } %>
+      </li>
+      <% }); %>
+    </ul>
+    <% } %>
+  </div>
+
+</div>
+
+<!-- ── Daily Saved Jobs — last 14 days ── -->
+<div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="font-semibold text-gray-900 text-sm">Daily Saved Jobs — last 14 days</h2>
+    <select id="daily-role-filter" onchange="renderDaily(this.value)"
+            class="rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-600 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+      <option value="all">All roles</option>
+      <% groups.forEach(g => { %>
+      <option value="<%= g.id %>"><%= g.group_name || ('Role ' + g.id) %></option>
+      <% }); %>
+    </select>
+  </div>
+  <div id="daily-legend" class="flex flex-wrap gap-x-4 gap-y-1 mb-4"></div>
+  <div id="daily-chart" style="display:flex;align-items:flex-end;gap:6px;"></div>
+</div>
+
+<!-- ── Monthly Saved Jobs — last 12 months ── -->
+<div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="font-semibold text-gray-900 text-sm">Monthly Saved Jobs — last 12 months</h2>
+    <select id="monthly-role-filter" onchange="renderMonthly(this.value)"
+            class="rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-600 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+      <option value="all">All roles</option>
+      <% groups.forEach(g => { %>
+      <option value="<%= g.id %>"><%= g.group_name || ('Role ' + g.id) %></option>
+      <% }); %>
+    </select>
+  </div>
+  <div id="monthly-legend" class="flex flex-wrap gap-x-4 gap-y-1 mb-4"></div>
+  <div id="monthly-chart" style="display:flex;align-items:flex-end;gap:6px;"></div>
+</div>
+
+<script>
+const DAILY_RAW   = <%- JSON.stringify(dailyGroupRaw) %>;
+const MONTHLY_RAW = <%- JSON.stringify(monthlyRaw) %>;
+
+// ── Verdict config ──────────────────────────────────────────────────────────
+const V_ORDER  = ['STRONG_MATCH','WEAK_MATCH','NO_MATCH','DUPLICATE','BLACKLISTED'];
+const V_CONFIG = {
+  STRONG_MATCH: { label:'Strong',      color:'#10b981' },
+  WEAK_MATCH:   { label:'Weak',        color:'#f59e0b' },
+  NO_MATCH:     { label:'No match',    color:'#f87171' },
+  DUPLICATE:    { label:'Duplicate',   color:'#c084fc' },
+  BLACKLISTED:  { label:'Blacklisted', color:'#9ca3af' },
+};
+
+// ── Tooltip ─────────────────────────────────────────────────────────────────
+let _tip = null;
+function _ensureTip() {
+  if (_tip) return;
+  _tip = document.createElement('div');
+  _tip.style.cssText = 'position:fixed;z-index:9999;background:#111827;color:#f9fafb;padding:8px 12px;border-radius:8px;font-size:12px;pointer-events:none;line-height:1.7;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.35);display:none;';
+  document.body.appendChild(_tip);
+}
+function showBarTip(e, el) {
+  _ensureTip();
+  const d = JSON.parse(el.dataset.tip);
+  const total = V_ORDER.reduce((s,v) => s + (d.verdicts[v] || 0), 0);
+  const lines = V_ORDER.filter(v => d.verdicts[v] > 0).map(v =>
+    `<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${V_CONFIG[v].color};margin-right:5px;vertical-align:middle;flex-shrink:0;"></span>${V_CONFIG[v].label}: <b>${d.verdicts[v]}</b>`
+  ).join('<br>');
+  _tip.innerHTML = `<div style="font-weight:700;margin-bottom:5px;border-bottom:1px solid rgba(255,255,255,.15);padding-bottom:4px;">${d.label} &mdash; ${total} saved</div>${lines}`;
+  _tip.style.display = 'block';
+  _moveTip(e);
+}
+function _moveTip(e) {
+  if (!_tip || _tip.style.display === 'none') return;
+  const w = _tip.offsetWidth, h = _tip.offsetHeight;
+  let x = e.clientX + 14, y = e.clientY - h - 10;
+  if (x + w > window.innerWidth - 8) x = e.clientX - w - 14;
+  if (y < 8) y = e.clientY + 14;
+  _tip.style.left = x + 'px';
+  _tip.style.top  = y + 'px';
+}
+function hideTip() { if (_tip) _tip.style.display = 'none'; }
+document.addEventListener('mousemove', _moveTip);
+
+// ── Shared bar builder ───────────────────────────────────────────────────────
+function buildBar(periodLabel, verdicts, maxTotal, BAR_H) {
+  const total = V_ORDER.reduce((s,v) => s + (verdicts[v] || 0), 0);
+  const totalH = total > 0 ? Math.max(Math.round(total / maxTotal * BAR_H), 4) : 0;
+
+  // Stacked segments top-to-bottom: STRONG (top) → WEAK → NO_MATCH → DUPLICATE → BLACKLISTED (bottom)
+  let segs = '', remaining = totalH;
+  const presentOrder = V_ORDER.filter(v => (verdicts[v] || 0) > 0);
+  for (let i = 0; i < presentOrder.length; i++) {
+    const v = presentOrder[i];
+    const cnt = verdicts[v];
+    const segH = i === presentOrder.length - 1
+      ? remaining   // last segment absorbs rounding remainder
+      : Math.round(cnt / total * totalH);
+    remaining -= segH;
+    segs += `<div style="width:100%;height:${segH}px;background:${V_CONFIG[v].color};flex-shrink:0;"></div>`;
+  }
+
+  const tipData = JSON.stringify({ label: periodLabel, verdicts });
+  const safeData = tipData.replace(/"/g,'&quot;');
+
+  return `
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;cursor:default;position:relative;">
+      <div style="position:relative;width:100%;height:${BAR_H}px;display:flex;align-items:flex-end;"
+           data-tip="${safeData}"
+           onmouseenter="showBarTip(event,this)" onmouseleave="hideTip()">
+        <div style="width:100%;height:${totalH}px;display:flex;flex-direction:column;border-radius:2px 2px 0 0;overflow:hidden;">
+          ${segs}
+        </div>
+        ${total > 0 ? `<span style="position:absolute;bottom:${totalH + 4}px;left:0;right:0;text-align:center;font-size:11px;font-weight:700;color:#374151;">${total}</span>` : ''}
+      </div>
+    </div>`;
+}
+
+// ── Legend builder ───────────────────────────────────────────────────────────
+function renderLegend(containerId, presentVerdicts) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = V_ORDER.filter(v => presentVerdicts.has(v)).map(v =>
+    `<div style="display:flex;align-items:center;gap:4px;">
+       <div style="width:10px;height:10px;border-radius:2px;background:${V_CONFIG[v].color};flex-shrink:0;"></div>
+       <span style="font-size:11px;color:#6b7280;">${V_CONFIG[v].label}</span>
+     </div>`
+  ).join('');
+}
+
+// ── Date helpers ─────────────────────────────────────────────────────────────
+const MN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function getLastNDays(n) {
+  const out = [];
+  const now = new Date();
+  for (let i = n-1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate()-i);
+    out.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'));
+  }
+  return out;
+}
+function getLastNMonths(n) {
+  const out = [];
+  const now = new Date();
+  for (let i = n-1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    out.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));
+  }
+  return out;
+}
+
+// ── Daily chart ──────────────────────────────────────────────────────────────
+function renderDaily(groupId) {
+  const days = getLastNDays(14);
+  const verdictMap = {};
+  const presentVerdicts = new Set();
+  for (const d of days) { verdictMap[d] = {}; for (const v of V_ORDER) verdictMap[d][v] = 0; }
+
+  for (const row of DAILY_RAW) {
+    if (groupId !== 'all' && String(row.group_id) !== String(groupId)) continue;
+    if (verdictMap[row.day] !== undefined && V_CONFIG[row.verdict]) {
+      verdictMap[row.day][row.verdict] += row.count;
+      presentVerdicts.add(row.verdict);
+    }
+  }
+
+  const BAR_H = 96;
+  const maxTotal = Math.max(...days.map(d => V_ORDER.reduce((s,v) => s + verdictMap[d][v], 0)), 1);
+
+  const container = document.getElementById('daily-chart');
+  container.style.height = (BAR_H + 20) + 'px';
+  container.innerHTML = days.map(d => {
+    const parts = d.split('-');
+    const label = MN[parseInt(parts[1])-1] + ' ' + parseInt(parts[2]);
+    return buildBar(label, verdictMap[d], maxTotal, BAR_H)
+      + `<span style="font-size:10px;color:#6b7280;text-align:center;display:block;margin-top:4px;width:100%;position:absolute;bottom:0;left:0;">${label}</span>`;
+  }).map((html, i) => `<div style="flex:1;position:relative;padding-bottom:20px;">${html}</div>`).join('');
+
+  renderLegend('daily-legend', presentVerdicts);
+}
+
+// ── Monthly chart ────────────────────────────────────────────────────────────
+function renderMonthly(groupId) {
+  const months = getLastNMonths(12);
+  const verdictMap = {};
+  const presentVerdicts = new Set();
+  for (const m of months) { verdictMap[m] = {}; for (const v of V_ORDER) verdictMap[m][v] = 0; }
+
+  for (const row of MONTHLY_RAW) {
+    if (groupId !== 'all' && String(row.group_id) !== String(groupId)) continue;
+    if (verdictMap[row.month] !== undefined && V_CONFIG[row.verdict]) {
+      verdictMap[row.month][row.verdict] += row.count;
+      presentVerdicts.add(row.verdict);
+    }
+  }
+
+  const BAR_H = 110;
+  const maxTotal = Math.max(...months.map(m => V_ORDER.reduce((s,v) => s + verdictMap[m][v], 0)), 1);
+
+  const container = document.getElementById('monthly-chart');
+  container.style.height = (BAR_H + 20) + 'px';
+  container.innerHTML = months.map(m => {
+    const label = MN[parseInt(m.slice(5))-1];
+    return buildBar(label, verdictMap[m], maxTotal, BAR_H)
+      + `<span style="font-size:10px;color:#6b7280;text-align:center;display:block;margin-top:4px;width:100%;position:absolute;bottom:0;left:0;">${label}</span>`;
+  }).map(html => `<div style="flex:1;position:relative;padding-bottom:20px;">${html}</div>`).join('');
+
+  renderLegend('monthly-legend', presentVerdicts);
+}
+
+renderDaily('all');
+renderMonthly('all');
+</script>

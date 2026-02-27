@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-50">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= title %> — Job Hunter</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50: '#EFF6FF', 500: '#3B82F6', 600: '#2563EB', 700: '#1D4ED8' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    [x-cloak] { display: none !important; }
+    .score-badge { font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body class="h-full font-sans antialiased text-gray-900">
+
+  <!-- Sidebar + content layout -->
+  <div class="flex min-h-full">
+
+    <!-- Sidebar -->
+    <aside class="w-56 flex-shrink-0 bg-gray-900 text-gray-100 flex flex-col sticky top-0 h-screen">
+      <!-- Logo -->
+      <div class="px-5 py-5 border-b border-gray-700">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 bg-blue-500 rounded-lg flex items-center justify-center text-white text-xs font-bold">JH</div>
+          <span class="font-semibold text-sm text-white">Job Hunter</span>
+        </div>
+      </div>
+
+      <!-- Nav -->
+      <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        <a href="/"
+           class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium <%= title === 'Start' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' %> transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+          Start
+        </a>
+        <a href="/jobs"
+           class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium <%= title === 'Jobs Match' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' %> transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+          Jobs Match
+        </a>
+        <a href="/history"
+           class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium <%= title === 'Jobs All' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' %> transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+          Jobs All
+        </a>
+        <a href="/analytics"
+           class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium <%= title === 'Stats' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' %> transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+          Stats
+        </a>
+        <a href="/reports"
+           class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium <%= title === 'Run Logs' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' %> transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+          Run Logs
+        </a>
+        <a href="/settings"
+           class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium <%= title === 'Settings' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' %> transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+          Settings
+        </a>
+      </nav>
+
+      <!-- Bottom action buttons -->
+      <div class="px-3 py-4 border-t border-gray-700 space-y-2">
+
+        <!-- Run Once (always visible) -->
+        <button id="sidebar-run-btn" onclick="sidebarRunOnce(this)"
+                class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <span id="sidebar-run-label">Run Once</span>
+        </button>
+
+        <!-- Schedule: inactive = blue, active = red Stop -->
+        <div id="schedule-inactive">
+          <button onclick="openScheduleModal()"
+                  class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            Schedule
+          </button>
+        </div>
+        <div id="schedule-active" class="hidden space-y-1">
+          <div class="flex items-center justify-between px-1">
+            <span class="flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block"></span>
+              Schedule active
+            </span>
+            <span id="schedule-expr" class="text-xs text-gray-500 font-mono"></span>
+          </div>
+          <button onclick="scheduleStop()"
+                  class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0zM9 10h6v4H9z"/>
+            </svg>
+            Stop Schedule
+          </button>
+        </div>
+
+        <p id="schedule-msg" class="text-xs text-gray-400 text-center hidden"></p>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="flex-1 overflow-y-auto">
+      <div class="max-w-6xl mx-auto px-6 py-8">
+        <%- body %>
+      </div>
+    </main>
+  </div>
+
+  <!-- Confirm modal (replaces browser confirm()) -->
+  <div id="jh-confirm-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="_jhConfirmResolve(false)"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div class="px-6 py-5">
+        <p id="jh-confirm-msg" class="text-sm text-gray-700 leading-relaxed"></p>
+      </div>
+      <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
+        <button onclick="_jhConfirmResolve(false)"
+                class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors">
+          Cancel
+        </button>
+        <button onclick="_jhConfirmResolve(true)"
+                class="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
+          Confirm
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alert modal (replaces browser alert()) -->
+  <div id="jh-alert-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="_jhAlertResolve()"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div class="px-6 py-5">
+        <p id="jh-alert-msg" class="text-sm text-gray-700 leading-relaxed"></p>
+      </div>
+      <div class="px-6 py-4 border-t border-gray-100 flex justify-end">
+        <button onclick="_jhAlertResolve()"
+                class="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
+          OK
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Verdict dropdown (shared across Jobs All + Run Reports) -->
+  <div id="verdict-dropdown" class="hidden fixed z-50 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden" style="min-width:148px">
+    <div class="py-1">
+      <button onclick="setVerdict('STRONG_MATCH')" class="w-full text-left px-4 py-2 text-sm hover:bg-emerald-50 text-emerald-700 font-medium">✅ Strong fit</button>
+      <button onclick="setVerdict('WEAK_MATCH')"   class="w-full text-left px-4 py-2 text-sm hover:bg-amber-50 text-amber-700 font-medium">⚠️ Weak fit</button>
+      <button onclick="setVerdict('NO_MATCH')"     class="w-full text-left px-4 py-2 text-sm hover:bg-red-50 text-red-600 font-medium">❌ No fit</button>
+      <button onclick="setVerdict('DUPLICATE')"    class="w-full text-left px-4 py-2 text-sm hover:bg-purple-50 text-purple-600 font-medium">🔁 Duplicate</button>
+    </div>
+  </div>
+
+  <!-- Schedule Modal -->
+  <div id="schedule-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeScheduleModal()"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+        <h2 class="font-semibold text-gray-900">Run Schedule</h2>
+        <button onclick="closeScheduleModal()" class="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="px-6 py-5 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">Run daily at</label>
+          <input id="sched-time-input" type="time" value="07:00"
+                 class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">Timezone</label>
+          <select id="sched-tz-select" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500">
+            <option value="UTC">GMT+0 (UTC)</option>
+            <option value="Europe/London">GMT+0 (London)</option>
+            <option value="Africa/Lagos">GMT+1 (Lagos)</option>
+            <option value="Europe/Paris">GMT+1 (Paris)</option>
+            <option value="Africa/Cairo">GMT+2 (Cairo)</option>
+            <option value="Africa/Johannesburg">GMT+2 (Johannesburg)</option>
+            <option value="Asia/Kuwait">GMT+3 (Kuwait)</option>
+            <option value="Asia/Riyadh">GMT+3 (Riyadh)</option>
+            <option value="Europe/Istanbul">GMT+3 (Istanbul)</option>
+            <option value="Europe/Moscow">GMT+3 (Moscow)</option>
+            <option value="Asia/Dubai">GMT+4 (Dubai)</option>
+            <option value="Asia/Yerevan">GMT+4 (Yerevan)</option>
+            <option value="Asia/Karachi">GMT+5 (Karachi)</option>
+            <option value="Asia/Kolkata">GMT+5:30 (Mumbai)</option>
+            <option value="Asia/Dhaka">GMT+6 (Dhaka)</option>
+            <option value="Asia/Bangkok">GMT+7 (Bangkok)</option>
+            <option value="Asia/Shanghai">GMT+8 (Shanghai)</option>
+            <option value="Asia/Singapore">GMT+8 (Singapore)</option>
+            <option value="Asia/Seoul">GMT+9 (Seoul)</option>
+            <option value="Asia/Tokyo">GMT+9 (Tokyo)</option>
+            <option value="Australia/Sydney">GMT+10 (Sydney)</option>
+            <option value="Pacific/Noumea">GMT+11 (Noumea)</option>
+            <option value="Pacific/Auckland">GMT+12 (Auckland)</option>
+            <option value="Pacific/Apia">GMT+13 (Apia)</option>
+            <option value="Atlantic/Azores">GMT-1 (Azores)</option>
+            <option value="America/Noronha">GMT-2 (Noronha)</option>
+            <option value="America/Argentina/Buenos_Aires">GMT-3 (Buenos Aires)</option>
+            <option value="America/Sao_Paulo">GMT-3 (São Paulo)</option>
+            <option value="America/Halifax">GMT-4 (Halifax)</option>
+            <option value="America/New_York">GMT-5 (New York)</option>
+            <option value="America/Chicago">GMT-6 (Chicago)</option>
+            <option value="America/Denver">GMT-7 (Denver)</option>
+            <option value="America/Los_Angeles">GMT-8 (Los Angeles)</option>
+            <option value="America/Anchorage">GMT-9 (Anchorage)</option>
+            <option value="Pacific/Honolulu">GMT-10 (Honolulu)</option>
+            <option value="Pacific/Pago_Pago">GMT-11 (Pago Pago)</option>
+          </select>
+        </div>
+        <p id="sched-modal-msg" class="hidden text-xs"></p>
+      </div>
+      <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
+        <button type="button" onclick="closeScheduleModal()"
+                class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors">
+          Cancel
+        </button>
+        <button id="sched-start-btn" onclick="startScheduleFromModal()"
+                class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2 rounded-xl text-sm transition-colors shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          Start Schedule
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function cronToLabel(expression, timezone) {
+      if (!expression) return '';
+      const parts = expression.split(' ');
+      if (parts.length < 2) return expression;
+      const h = String(parts[1]).padStart(2, '0');
+      const m = String(parts[0]).padStart(2, '0');
+      const tz = (timezone || 'UTC').split('/').pop().replace(/_/g, ' ');
+      return h + ':' + m + ' ' + tz;
+    }
+
+    function setScheduleUI(active, expression, timezone) {
+      document.getElementById('schedule-inactive').classList.toggle('hidden', active);
+      document.getElementById('schedule-active').classList.toggle('hidden', !active);
+      if (expression) document.getElementById('schedule-expr').textContent = cronToLabel(expression, timezone);
+    }
+
+    function showScheduleMsg(text, isError) {
+      const el = document.getElementById('schedule-msg');
+      el.textContent = text;
+      el.className = 'text-xs text-center mt-2 ' + (isError ? 'text-red-400' : 'text-gray-400');
+      el.classList.remove('hidden');
+      setTimeout(() => el.classList.add('hidden'), 4000);
+    }
+
+    function openScheduleModal() {
+      // Pre-fill with current settings from API
+      fetch('/api/schedule/status').then(r => r.json()).then(data => {
+        if (data.email_send_time) {
+          document.getElementById('sched-time-input').value = data.email_send_time;
+        }
+        if (data.timezone) {
+          document.getElementById('sched-tz-select').value = data.timezone;
+        }
+      }).catch(() => {});
+      document.getElementById('sched-modal-msg').classList.add('hidden');
+      document.getElementById('sched-start-btn').disabled = false;
+      document.getElementById('sched-start-btn').textContent = 'Start Schedule';
+      document.getElementById('schedule-modal').classList.remove('hidden');
+    }
+
+    function closeScheduleModal() {
+      document.getElementById('schedule-modal').classList.add('hidden');
+    }
+
+    async function startScheduleFromModal() {
+      const time = document.getElementById('sched-time-input').value;
+      const timezone = document.getElementById('sched-tz-select').value;
+      const btn = document.getElementById('sched-start-btn');
+      const msgEl = document.getElementById('sched-modal-msg');
+
+      btn.disabled = true;
+      btn.textContent = 'Starting…';
+      msgEl.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/schedule/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email_send_time: time, timezone }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setScheduleUI(true, data.expression, data.timezone);
+          showScheduleMsg('Schedule started', false);
+          closeScheduleModal();
+        } else {
+          msgEl.textContent = data.error || 'Error starting schedule';
+          msgEl.className = 'text-xs text-red-600';
+          msgEl.classList.remove('hidden');
+          btn.disabled = false;
+          btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Start Schedule';
+        }
+      } catch (e) {
+        msgEl.textContent = 'Network error';
+        msgEl.className = 'text-xs text-red-600';
+        msgEl.classList.remove('hidden');
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Start Schedule';
+      }
+    }
+
+    async function scheduleStop() {
+      try {
+        const res = await fetch('/api/schedule/stop', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          setScheduleUI(false, null);
+          showScheduleMsg('Schedule stopped', false);
+        }
+      } catch (e) {
+        showScheduleMsg('Network error', true);
+      }
+    }
+
+    async function sidebarRunOnce(btn) {
+      const label = document.getElementById('sidebar-run-label');
+      btn.disabled = true;
+      label.textContent = 'Running…';
+      try {
+        const res = await fetch('/api/run', { method: 'POST' });
+        const data = await res.json();
+        label.textContent = data.success ? 'Started!' : (data.error || 'Error');
+      } catch(e) {
+        label.textContent = 'Error';
+      } finally {
+        setTimeout(() => { btn.disabled = false; label.textContent = 'Run Once'; }, 4000);
+      }
+    }
+
+    // Restore schedule state on every page load
+    fetch('/api/schedule/status').then(r => r.json()).then(data => {
+      setScheduleUI(data.active, data.expression, data.timezone);
+    }).catch(() => {});
+
+    // Close schedule modal on Escape
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        closeScheduleModal();
+        closeVerdictDropdown();
+        if (_jhConfirmResolve) _jhConfirmResolve(false);
+        if (_jhAlertResolve) _jhAlertResolve();
+      }
+    });
+
+    // ---- Clickable row helper ----
+    function jobRowClick(event, url) {
+      if (event.target.closest('.verdict-btn') || event.target.closest('a') || event.target.closest('button')) return;
+      location.href = url;
+    }
+
+    // ---- Styled confirm / alert helpers ----
+    let _jhConfirmResolve = null;
+    function showConfirm(msg) {
+      return new Promise(resolve => {
+        _jhConfirmResolve = (v) => {
+          document.getElementById('jh-confirm-modal').classList.add('hidden');
+          resolve(v);
+        };
+        document.getElementById('jh-confirm-msg').textContent = msg;
+        document.getElementById('jh-confirm-modal').classList.remove('hidden');
+      });
+    }
+
+    let _jhAlertResolve = null;
+    function showAlert(msg) {
+      return new Promise(resolve => {
+        _jhAlertResolve = () => {
+          document.getElementById('jh-alert-modal').classList.add('hidden');
+          resolve();
+        };
+        document.getElementById('jh-alert-msg').textContent = msg;
+        document.getElementById('jh-alert-modal').classList.remove('hidden');
+      });
+    }
+
+    // ---- Verdict dropdown ----
+    let _verdictBtn = null;
+
+    function openVerdictDropdown(btn) {
+      _verdictBtn = btn;
+      const dd = document.getElementById('verdict-dropdown');
+      dd.classList.remove('hidden');
+      const rect = btn.getBoundingClientRect();
+      const ddW = 160;
+      let left = rect.left + window.scrollX;
+      if (left + ddW > window.innerWidth - 8) left = window.innerWidth - ddW - 8;
+      dd.style.top  = (rect.bottom + window.scrollY + 4) + 'px';
+      dd.style.left = left + 'px';
+    }
+
+    function closeVerdictDropdown() {
+      document.getElementById('verdict-dropdown').classList.add('hidden');
+      _verdictBtn = null;
+    }
+
+    // Close on outside click
+    document.addEventListener('click', e => {
+      const dd = document.getElementById('verdict-dropdown');
+      if (!dd.classList.contains('hidden') && !dd.contains(e.target) && !e.target.closest('.verdict-btn')) {
+        closeVerdictDropdown();
+      }
+    });
+
+    // Open on verdict-btn click (event delegation)
+    document.addEventListener('click', e => {
+      const btn = e.target.closest('.verdict-btn');
+      if (btn) { e.stopPropagation(); openVerdictDropdown(btn); }
+    });
+
+    function verdictChipHTML(verdict, style) {
+      const detail = {
+        STRONG_MATCH: '<span class="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">STRONG MATCH ▾</span>',
+        WEAK_MATCH:   '<span class="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">WEAK MATCH ▾</span>',
+        NO_MATCH:     '<span class="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-600 border border-red-200">NO MATCH ▾</span>',
+        DUPLICATE:    '<span class="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-600 border border-purple-200">DUPLICATE ▾</span>',
+      };
+      const compact = {
+        STRONG_MATCH: '<span class="px-1.5 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700 whitespace-nowrap">Strong ▾</span>',
+        WEAK_MATCH:   '<span class="px-1.5 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 whitespace-nowrap">Weak ▾</span>',
+        NO_MATCH:     '<span class="px-1.5 py-0.5 rounded text-xs font-medium bg-red-50 text-red-500 whitespace-nowrap">No match ▾</span>',
+        DUPLICATE:    '<span class="px-1.5 py-0.5 rounded text-xs font-medium bg-purple-50 text-purple-600 whitespace-nowrap">Duplicate ▾</span>',
+      };
+      const full = {
+        STRONG_MATCH: '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 whitespace-nowrap">✅ Strong fit ▾</span>',
+        WEAK_MATCH:   '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 whitespace-nowrap">⚠️ Weak fit ▾</span>',
+        NO_MATCH:     '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 whitespace-nowrap">❌ No fit ▾</span>',
+        DUPLICATE:    '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-600 whitespace-nowrap">🔁 Duplicate ▾</span>',
+      };
+      const map = style === 'detail' ? detail : style === 'full' ? full : compact;
+      return map[verdict] || verdict;
+    }
+
+    async function setVerdict(newVerdict) {
+      const btn = _verdictBtn;
+      if (!btn) return;
+      const jobId  = btn.dataset.jobId;
+      const current = btn.dataset.verdict;
+      closeVerdictDropdown();
+      if (newVerdict === current) return;
+      const labels = { STRONG_MATCH: 'Strong fit', WEAK_MATCH: 'Weak fit', NO_MATCH: 'No fit', DUPLICATE: 'Duplicate' };
+      const ok = await showConfirm('Change status to "' + (labels[newVerdict] || newVerdict) + '"?');
+      if (!ok) return;
+      try {
+        const res = await fetch('/api/jobs/' + jobId + '/verdict', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ verdict: newVerdict }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (btn.dataset.chipStyle === 'detail') {
+            location.reload();
+          } else {
+            btn.innerHTML = verdictChipHTML(newVerdict, btn.dataset.chipStyle || 'compact');
+            btn.dataset.verdict = newVerdict;
+          }
+        } else {
+          await showAlert(data.error || 'Failed to update status');
+        }
+      } catch (e) {
+        await showAlert('Could not reach the server. Make sure the app is running and try again.');
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,473 @@
+<%
+function scoreTextColor(score) {
+  if (score >= 85) return 'text-emerald-700 bg-emerald-50';
+  if (score >= 71) return 'text-emerald-600 bg-emerald-50';
+  return 'text-gray-600 bg-gray-100';
+}
+function formatDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
+}
+function statusColor(s) {
+  if (s === 'success') return 'text-emerald-700 bg-emerald-50';
+  if (s === 'partial_error') return 'text-amber-700 bg-amber-50';
+  return 'text-red-700 bg-red-50';
+}
+%>
+
+<!-- Page header -->
+<div class="flex items-center justify-between mb-4">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900">Start</h1>
+    <p class="text-sm text-gray-500 mt-1"><%= new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) %></p>
+  </div>
+</div>
+
+<!-- ── Getting Started — Inline collapsible block ── -->
+<div class="bg-blue-50 border border-blue-200 rounded-xl mb-6 overflow-hidden">
+  <button onclick="toggleGS()" class="w-full flex items-center justify-between px-5 py-3.5 cursor-pointer hover:bg-blue-100/50 transition-colors">
+    <div class="flex items-center gap-3">
+      <span class="text-sm font-semibold text-blue-900">Getting Started</span>
+      <span class="flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full <%= checklist.hasGroups ? 'bg-emerald-500' : 'bg-blue-200' %>"></span>
+        <span class="w-2 h-2 rounded-full <%= checklist.hasRun    ? 'bg-emerald-500' : 'bg-blue-200' %>"></span>
+        <span class="w-2 h-2 rounded-full <%= checklist.hasSchedule ? 'bg-emerald-500' : 'bg-blue-200' %>"></span>
+      </span>
+    </div>
+    <div class="flex items-center gap-3">
+      <span role="button" tabindex="0"
+            onclick="event.stopPropagation(); openHowItWorks()"
+            onkeydown="if(event.key==='Enter'){event.stopPropagation();openHowItWorks();}"
+            class="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 transition-colors">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        How it works
+      </span>
+      <svg id="gs-chevron" class="w-4 h-4 text-blue-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+      </svg>
+    </div>
+  </button>
+  <div id="gs-body" class="px-5 pb-5">
+    <ol class="space-y-4">
+
+      <!-- Step 1: Set up Roles + API keys -->
+      <li class="flex gap-3">
+        <% if (checklist.hasGroups) { %>
+        <span class="w-5 h-5 mt-0.5 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
+          <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+        </span>
+        <p class="text-sm text-gray-400 line-through leading-snug">Set up Roles and API keys in <a href="/settings" class="text-blue-400 hover:underline">Settings</a></p>
+        <% } else { %>
+        <span class="w-5 h-5 mt-0.5 rounded-full border-2 border-blue-400 flex-shrink-0"></span>
+        <p class="text-sm text-gray-700 leading-snug">Go to <a href="/settings" class="text-blue-600 hover:underline font-medium">Settings</a> — create your Roles (a Role is a job title + location + filters combination). Add your API keys: RapidAPI key for LinkedIn job fetching and OpenAI key for AI scoring</p>
+        <% } %>
+      </li>
+
+      <!-- Step 2: Run once + verify -->
+      <li class="flex gap-3">
+        <% if (checklist.hasRun) { %>
+        <span class="w-5 h-5 mt-0.5 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
+          <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+        </span>
+        <p class="text-sm text-gray-400 line-through leading-snug">Press 'Run Once' and check <a href="/reports" class="text-blue-400 hover:underline">Run Logs</a> — agree on AI verdicts, or tinker the prompt in <a href="/settings" class="text-blue-400 hover:underline">Settings</a></p>
+        <% } else { %>
+        <span class="w-5 h-5 mt-0.5 rounded-full border-2 border-blue-400 flex-shrink-0"></span>
+        <p class="text-sm text-gray-700 leading-snug">Press <strong>Run Once</strong> and check <a href="/reports" class="text-blue-600 hover:underline font-medium">Run Logs</a> to see that you agree on the AI verdicts. If not, tinker with the prompt in <a href="/settings" class="text-blue-600 hover:underline font-medium">Settings</a></p>
+        <% } %>
+      </li>
+
+      <!-- Step 3: Schedule -->
+      <li class="flex gap-3">
+        <% if (checklist.hasSchedule) { %>
+        <span class="w-5 h-5 mt-0.5 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
+          <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+        </span>
+        <p class="text-sm text-gray-400 line-through leading-snug">If the AI assessment is fine, press 'Schedule' to start a daily job search process</p>
+        <% } else { %>
+        <span class="w-5 h-5 mt-0.5 rounded-full border-2 border-blue-400 flex-shrink-0"></span>
+        <p class="text-sm text-gray-700 leading-snug">If the AI assessment is fine, press <strong>Schedule</strong> to start a daily job search process. You can also set up email digests in <a href="/settings" class="text-blue-600 hover:underline font-medium">Settings</a> so strong matches land in your inbox each morning</p>
+        <% } %>
+      </li>
+
+    </ol>
+
+    <!-- Ongoing tip -->
+    <p class="text-sm text-gray-600 leading-snug mt-4">Daily, check <a href="/jobs" class="text-blue-600 hover:underline font-medium">Jobs Match</a> for new strong matches. Open any job for the full description, AI rationale, and summary. Fix wrong verdicts inline, mark jobs as Applied after sending your CV. Every job ever seen — all verdicts — is in <a href="/history" class="text-blue-600 hover:underline font-medium">Jobs All</a>. Make sure you have at least $1+ on your <a href="https://platform.openai.com/usage" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline font-medium">OpenAI account</a>.</p>
+  </div>
+</div>
+
+
+<!-- ── Search for Jobs ── -->
+<div id="run-card" class="relative bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
+  <!-- Preview fetch — small top-right corner button -->
+  <button id="fetch-preview-btn" onclick="fetchPreview(this)"
+          title="Preview fetch — fetches jobs without AI scoring. Useful for testing your search configuration."
+          class="absolute top-3 right-3 w-6 h-6 flex items-center justify-center text-xs font-semibold text-gray-300 hover:text-gray-500 border border-gray-200 hover:border-gray-300 bg-gray-50 hover:bg-gray-100 rounded transition-colors">
+    <span id="fetch-preview-label">P</span>
+  </button>
+  <div class="flex items-center justify-between flex-wrap gap-4">
+    <div>
+      <h2 class="font-semibold text-gray-900">Search for Jobs</h2>
+      <p class="text-sm text-gray-500 mt-0.5">Fetch LinkedIn jobs, score with AI, send email digest.</p>
+    </div>
+    <div class="flex items-center gap-2 pr-8">
+      <button onclick="homeSchedule()"
+              class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors shadow-sm">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        Schedule
+      </button>
+      <button id="home-run-btn" onclick="homeRun(this)"
+              class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors shadow-sm">
+        <svg id="home-run-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <span id="home-run-label">Run Once</span>
+      </button>
+    </div>
+  </div>
+  <div id="preflight-errors" class="hidden mt-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+    <p class="text-xs font-semibold text-red-700 mb-1.5">Can't run — fix the following first:</p>
+    <ul id="preflight-errors-list" class="space-y-0.5 text-xs text-red-600 list-disc list-inside"></ul>
+  </div>
+  <div id="home-run-progress" class="hidden mt-4">
+    <div class="flex items-center gap-3 text-sm text-gray-600">
+      <svg class="w-4 h-4 animate-spin text-emerald-600 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+      </svg>
+      <span id="home-run-status-text">Pipeline running…</span>
+    </div>
+    <div class="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+      <div id="home-run-bar" class="h-full bg-emerald-500 rounded-full transition-all duration-1000" style="width:5%"></div>
+    </div>
+  </div>
+  <div id="home-run-result" class="hidden mt-4 text-sm"></div>
+</div>
+
+<!-- ── Last run + last matches (side by side) ── -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+  <!-- Last run stats (compact) -->
+  <div>
+    <% if (lastRun) { %>
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-semibold text-gray-700">Last Run</h2>
+        <span class="text-xs px-2 py-0.5 rounded-full font-medium <%= statusColor(lastRun.status) %>">
+          <%= lastRun.status.replace('_', ' ') %>
+        </span>
+      </div>
+      <div class="grid grid-cols-3 gap-2 text-center">
+        <div class="bg-gray-50 rounded-lg p-2">
+          <div class="text-base font-bold text-gray-900"><%= lastRun.jobs_fetched %></div>
+          <div class="text-xs text-gray-400">Fetched</div>
+        </div>
+        <div class="bg-emerald-50 rounded-lg p-2">
+          <div class="text-base font-bold text-emerald-600"><%= lastRun.jobs_strong_match %></div>
+          <div class="text-xs text-gray-400">Strong</div>
+        </div>
+        <div class="bg-purple-50 rounded-lg p-2">
+          <div class="text-base font-bold text-purple-600"><%= lastRun.jobs_duplicate %></div>
+          <div class="text-xs text-gray-400">Duplicates</div>
+        </div>
+      </div>
+      <p class="text-xs text-gray-400 mt-3"><%= formatDate(lastRun.ran_at) %><% if (lastRun.duration_ms) { %> · <%= (lastRun.duration_ms / 1000).toFixed(0) %>s<% } %></p>
+      <% if (lastRun.error_log) { %>
+      <details class="mt-2">
+        <summary class="text-xs text-red-500 cursor-pointer">Error details</summary>
+        <pre class="text-xs text-red-600 bg-red-50 p-2 rounded mt-1 overflow-auto max-h-24"><%= lastRun.error_log %></pre>
+      </details>
+      <% } %>
+    </div>
+    <% } else { %>
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 text-center text-sm text-gray-400">
+      No runs yet. Hit <strong>Run Once</strong> to start.
+    </div>
+    <% } %>
+  </div>
+
+  <!-- Last job matches -->
+  <div class="lg:col-span-2">
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <h2 class="font-semibold text-gray-900 text-sm">Last Run — Strong Matches</h2>
+        <div class="flex items-center gap-3">
+          <% if (lastRunJobs.length > 50) { %><span class="text-xs text-gray-400">showing 50 of <%= lastRunJobs.length %></span><% } %>
+          <a href="/jobs" class="text-xs text-blue-600 hover:underline">View all →</a>
+        </div>
+      </div>
+      <% if (lastRunJobs.length === 0) { %>
+      <div class="px-5 py-10 text-center text-sm text-gray-400">No strong matches from the last run.</div>
+      <% } else { %>
+      <ul class="divide-y divide-gray-50">
+        <% lastRunJobs.slice(0, 50).forEach(job => { %>
+        <li class="px-5 py-3.5 hover:bg-gray-50 transition-colors cursor-pointer" onclick="location.href='/job/<%= job.id %>?from=home'">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium text-gray-900 truncate"><%= job.title %></p>
+              <p class="text-xs text-gray-400 mt-0.5 truncate"><%= job.company %><% if (job.location) { %> · <%= job.location %><% } %></p>
+            </div>
+            <span class="inline-block font-bold text-xs score-badge <%= scoreTextColor(job.ai_score) %> px-2 py-0.5 rounded flex-shrink-0">
+              <%= job.ai_score %>%
+            </span>
+          </div>
+        </li>
+        <% }); %>
+      </ul>
+      <% } %>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let homeRunPoller = null;
+
+async function preflight() {
+  const res = await fetch('/api/preflight');
+  return res.json(); // { ok, errors }
+}
+
+function showPreflightErrors(errors) {
+  const wrap = document.getElementById('preflight-errors');
+  const list = document.getElementById('preflight-errors-list');
+  list.innerHTML = errors.map(e => `<li>${escHtml(e)}</li>`).join('');
+  wrap.classList.remove('hidden');
+}
+
+function clearPreflightErrors() {
+  document.getElementById('preflight-errors').classList.add('hidden');
+  document.getElementById('preflight-errors-list').innerHTML = '';
+}
+
+async function homeSchedule() {
+  clearPreflightErrors();
+  try {
+    const check = await preflight();
+    if (!check.ok) { showPreflightErrors(check.errors); return; }
+  } catch (e) {
+    showPreflightErrors(['Could not verify configuration: ' + e.message]);
+    return;
+  }
+  openScheduleModal();
+}
+
+async function homeRun(btn) {
+  clearPreflightErrors();
+  try {
+    const check = await preflight();
+    if (!check.ok) { showPreflightErrors(check.errors); return; }
+  } catch (e) {
+    showPreflightErrors(['Could not verify configuration: ' + e.message]);
+    return;
+  }
+
+  const label = document.getElementById('home-run-label');
+  const progress = document.getElementById('home-run-progress');
+  const result = document.getElementById('home-run-result');
+  const bar = document.getElementById('home-run-bar');
+  const statusText = document.getElementById('home-run-status-text');
+
+  btn.disabled = true;
+  btn.classList.add('opacity-60', 'cursor-not-allowed');
+  label.textContent = 'Running…';
+  progress.classList.remove('hidden');
+  result.classList.add('hidden');
+  bar.style.transition = 'none';
+  bar.style.width = '2%';
+
+  let expectedMs = 90_000;
+  try {
+    const s = await fetch('/api/status');
+    const sd = await s.json();
+    const lastDuration = sd.lastRun?.duration_ms ?? sd.lastRun?.durationMs;
+    if (lastDuration && lastDuration > 0) expectedMs = lastDuration;
+  } catch (_) {}
+
+  try {
+    const res = await fetch('/api/run', { method: 'POST' });
+    const data = await res.json();
+    if (!data.success) {
+      showRunResult(data.error || 'Failed to start', false);
+      resetRunBtn(btn, label, progress);
+      return;
+    }
+  } catch (e) {
+    showRunResult('Network error', false);
+    resetRunBtn(btn, label, progress);
+    return;
+  }
+
+  const barDurationMs = Math.round(expectedMs * 0.9);
+  requestAnimationFrame(() => {
+    bar.style.transition = `width ${barDurationMs}ms linear`;
+    bar.style.width = '90%';
+  });
+
+  const messages = ['Fetching jobs from LinkedIn…','Scoring jobs with AI…','Running semantic dedup…','Generating summaries…','Sending email report…'];
+  const msgInterval = barDurationMs / messages.length;
+  messages.forEach((msg, i) => { setTimeout(() => { statusText.textContent = msg; }, i * msgInterval); });
+
+  homeRunPoller = setInterval(async () => {
+    try {
+      const res = await fetch('/api/status');
+      const data = await res.json();
+      if (!data.isRunning && data.lastRun) {
+        clearInterval(homeRunPoller);
+        bar.style.transition = 'width 0.4s ease';
+        bar.style.width = '100%';
+        const r = data.lastRun;
+        const ok = r.status === 'success' || r.status === 'partial_error';
+        const tookSec = r.duration_ms ? ` (${(r.duration_ms / 1000).toFixed(0)}s)` : '';
+        showRunResult(
+          ok ? `Done${tookSec} — fetched ${r.jobs_fetched}, strong matches: ${r.jobs_strong_match}. <a href="/" class="underline font-medium">Refresh</a>` : `Failed: ${r.error_log || 'unknown error'}`,
+          ok,
+        );
+        resetRunBtn(btn, label, progress);
+        if (ok) setTimeout(() => location.reload(), 3000);
+      }
+    } catch (_) {}
+  }, 3000);
+}
+
+function showRunResult(msg, success) {
+  const el = document.getElementById('home-run-result');
+  el.innerHTML = `<span class="${success ? 'text-emerald-700' : 'text-red-600'}">${msg}</span>`;
+  el.classList.remove('hidden');
+}
+
+function resetRunBtn(btn, label, progress) {
+  setTimeout(() => {
+    btn.disabled = false;
+    btn.classList.remove('opacity-60', 'cursor-not-allowed');
+    label.textContent = 'Run Once';
+    progress.classList.add('hidden');
+  }, 3000);
+}
+
+async function fetchPreview(btn) {
+  const label = document.getElementById('fetch-preview-label');
+  btn.disabled = true;
+  btn.classList.add('opacity-60', 'cursor-not-allowed');
+  label.textContent = '…';
+  try {
+    const res = await fetch('/api/fetch-preview', { method: 'POST' });
+    const data = await res.json();
+    if (!data.success) { alert('Error: ' + (data.error || 'Unknown error')); return; }
+    showFetchPreviewModal(data.count, data.jobs);
+  } catch (e) {
+    alert('Network error: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('opacity-60', 'cursor-not-allowed');
+    label.textContent = 'P';
+  }
+}
+
+function showFetchPreviewModal(count, jobs) {
+  const existing = document.getElementById('fetch-preview-modal');
+  if (existing) existing.remove();
+  const rows = jobs.map(j => `
+    <tr class="border-b border-gray-100 hover:bg-gray-50">
+      <td class="py-2.5 pr-4 text-sm text-gray-700 font-medium whitespace-nowrap">${escHtml(j.company)}</td>
+      <td class="py-2.5 pr-4 text-sm text-gray-900">${escHtml(j.title)}</td>
+      <td class="py-2.5 text-sm">${j.url ? `<a href="${escHtml(j.url)}" target="_blank" class="text-blue-600 hover:underline whitespace-nowrap">View →</a>` : '<span class="text-gray-400">—</span>'}</td>
+    </tr>`).join('');
+  const modal = document.createElement('div');
+  modal.id = 'fetch-preview-modal';
+  modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4';
+  modal.innerHTML = `
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="document.getElementById('fetch-preview-modal').remove()"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+        <div><h2 class="font-semibold text-gray-900 text-lg">Fetch Preview</h2>
+        <p class="text-sm text-gray-500 mt-0.5"><span class="font-semibold text-blue-600">${count}</span> job${count !== 1 ? 's' : ''} fetched</p></div>
+        <button onclick="document.getElementById('fetch-preview-modal').remove()" class="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="overflow-y-auto flex-1 px-6 py-2">
+        ${count === 0 ? '<p class="text-center text-gray-400 py-8">No jobs found.</p>' :
+          `<table class="w-full"><thead><tr class="text-xs text-gray-400 uppercase tracking-wide border-b border-gray-100">
+            <th class="pb-2 pr-4 text-left font-medium">Company</th><th class="pb-2 pr-4 text-left font-medium">Title</th><th class="pb-2 text-left font-medium">Link</th>
+          </tr></thead><tbody>${rows}</tbody></table>`}
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+fetch('/api/status').then(r => r.json()).then(data => {
+  if (data.isRunning) {
+    const btn = document.getElementById('home-run-btn');
+    btn.disabled = true;
+    btn.classList.add('opacity-60', 'cursor-not-allowed');
+    document.getElementById('home-run-label').textContent = 'Running…';
+    document.getElementById('home-run-progress').classList.remove('hidden');
+  }
+}).catch(() => {});
+
+// ── Getting Started panel ──
+const GS_ALL_DONE = <%- (checklist.hasGroups && checklist.hasRun && checklist.hasSchedule) ? 'true' : 'false' %>;
+
+function toggleGS() {
+  const body = document.getElementById('gs-body');
+  const chevron = document.getElementById('gs-chevron');
+  const isHidden = body.classList.toggle('hidden');
+  chevron.style.transform = isHidden ? 'rotate(-90deg)' : '';
+  try { localStorage.setItem('gs-open', isHidden ? '0' : '1'); } catch(_) {}
+}
+
+(function initGS() {
+  const body = document.getElementById('gs-body');
+  const chevron = document.getElementById('gs-chevron');
+  try {
+    const stored = localStorage.getItem('gs-open');
+    if (stored !== null) {
+      // Explicit user preference wins
+      if (stored === '0') { body.classList.add('hidden'); chevron.style.transform = 'rotate(-90deg)'; }
+      return;
+    }
+  } catch(_) {}
+  // No stored preference: auto-collapse when all 3 steps are done
+  if (GS_ALL_DONE) { body.classList.add('hidden'); chevron.style.transform = 'rotate(-90deg)'; }
+})();
+
+// ── How it works modal ──
+function openHowItWorks() {
+  if (document.getElementById('hiw-modal')) { document.getElementById('hiw-modal').remove(); return; }
+  const modal = document.createElement('div');
+  modal.id = 'hiw-modal';
+  modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4';
+  modal.innerHTML = `
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="document.getElementById('hiw-modal').remove()"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+        <h2 class="font-semibold text-gray-900">How it works</h2>
+        <button onclick="document.getElementById('hiw-modal').remove()"
+                class="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <ol class="px-6 py-5 space-y-3 text-sm text-gray-600 leading-relaxed list-none">
+        <li><span class="font-semibold text-gray-800">1. Fetch</span> — Apify scrapes LinkedIn for each Role's keywords × locations combination.</li>
+        <li><span class="font-semibold text-gray-800">2. Title filter</span> — removes jobs whose title doesn't contain your filter words (if configured per Role).</li>
+        <li><span class="font-semibold text-gray-800">3. Blacklist</span> — removes jobs from blacklisted companies.</li>
+        <li><span class="font-semibold text-gray-800">4. Dedup by LinkedIn ID</span> — removes jobs already stored from previous runs (exact match).</li>
+        <li><span class="font-semibold text-gray-800">5. AI scoring</span> — one call per new job: scores it 0–100 against the Role's prompt → verdict (Strong / Weak / No Match) + short rationale.</li>
+        <li><span class="font-semibold text-gray-800">6. Dedup &amp; summary</span> — one call per Strong Match: checks whether the DB already has a job with the same company + title (repost detection), then writes a one-paragraph summary if it's genuinely new.</li>
+        <li><span class="font-semibold text-gray-800">7. Store</span> — all results saved locally (every verdict, including blacklisted and duplicates).</li>
+        <li><span class="font-semibold text-gray-800">8. Email digest</span> — strong matches emailed to you (if enabled in Settings).</li>
+      </ol>
+    </div>`;
+  document.body.appendChild(modal);
+}
+</script>

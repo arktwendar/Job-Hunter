@@ -1,0 +1,195 @@
+<%
+function fmtDate(iso) {
+  if (!iso) return { date: '—', time: '' };
+  // Use UTC to stay consistent with stored timestamps
+  const s = String(iso);
+  return { date: s.slice(0, 10), time: s.slice(11, 16) };
+}
+
+function statusBadge(status) {
+  if (status === 'success')       return 'bg-emerald-50 text-emerald-700';
+  if (status === 'partial_error') return 'bg-amber-50 text-amber-700';
+  if (status === 'running')       return 'bg-blue-50 text-blue-700';
+  return 'bg-red-50 text-red-600';
+}
+
+function statusLabel(status) {
+  if (status === 'partial_error') return 'partial error';
+  return status;
+}
+
+function verdictChip(verdict, rejectionCategory) {
+  if (verdict === 'STRONG_MATCH')
+    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 whitespace-nowrap">✅ Strong fit ▾</span>';
+  if (verdict === 'WEAK_MATCH')
+    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 whitespace-nowrap">⚠️ Weak fit ▾</span>';
+  if (verdict === 'BLACKLISTED')
+    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 whitespace-nowrap">🚫 Blacklisted</span>';
+  if (verdict === 'DUPLICATE')
+    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-600 whitespace-nowrap">🔁 Duplicate ▾</span>';
+  if (verdict === 'FILTERED')
+    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500 whitespace-nowrap">✂ Filtered</span>';
+  if (verdict === 'NO_MATCH') {
+    if (rejectionCategory === 'NO_VISA_SPONSORSHIP')
+      return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 whitespace-nowrap">❌ No visa support ▾</span>';
+    if (rejectionCategory === 'PROFILE_MISMATCH')
+      return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 whitespace-nowrap">❌ Profile mismatch ▾</span>';
+    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 whitespace-nowrap">❌ No fit ▾</span>';
+  }
+  return '';
+}
+%>
+
+<!-- Page header -->
+<div class="mb-8">
+  <h1 class="text-2xl font-bold text-gray-900">Run Reports</h1>
+  <p class="text-sm text-gray-500 mt-1">Full audit log of every pipeline run — showing last <%= runs.length %> run<%= runs.length !== 1 ? 's' : '' %></p>
+</div>
+
+<% if (runs.length === 0) { %>
+<div class="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">
+  <svg class="w-10 h-10 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+  </svg>
+  <p class="text-sm text-gray-500">No pipeline runs yet. Run the pipeline from the Dashboard to see results here.</p>
+</div>
+<% } else { %>
+
+<div class="space-y-3">
+<% runs.forEach(run => {
+  const dt = fmtDate(run.ran_at);
+  const totalJobs = run.countryGroups.reduce((s, g) => s + g.jobs.length, 0);
+%>
+
+<details class="group bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+  <summary class="flex items-center justify-between px-5 py-4 cursor-pointer select-none list-none hover:bg-gray-50 transition-colors">
+    <div class="flex items-center gap-3 flex-wrap min-w-0">
+      <!-- Expand/collapse chevron -->
+      <svg class="w-4 h-4 text-gray-400 flex-shrink-0 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+      </svg>
+
+      <!-- Date & time -->
+      <div class="flex items-center gap-2">
+        <span class="font-semibold text-gray-900 text-sm"><%= dt.date %></span>
+        <span class="text-gray-400 text-xs">·</span>
+        <span class="text-gray-500 text-sm"><%= dt.time %> UTC</span>
+      </div>
+
+      <!-- Status badge -->
+      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize <%= statusBadge(run.status) %>">
+        <%= statusLabel(run.status) %>
+      </span>
+
+      <!-- Trigger badge -->
+      <% if (run.trigger === 'manual') { %>
+      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-600">manual</span>
+      <% } %>
+    </div>
+
+    <!-- Stats summary -->
+    <div class="flex items-center gap-3 flex-shrink-0 ml-4">
+      <span class="text-xs text-gray-500 hidden sm:block">
+        <span class="font-medium text-gray-700"><%= run.jobs_fetched %></span> fetched
+        · <span class="font-medium text-emerald-600"><%= run.jobs_strong_match %></span> strong
+        · <span class="font-medium text-amber-600"><%= run.jobs_weak_match %></span> weak
+        · <span class="font-medium text-red-500"><%= run.jobs_no_match %></span> no match
+        · <span class="font-medium text-purple-600"><%= run.jobs_duplicate %></span> duplicates
+        <% if (run.filteredCount > 0) { %>· <span class="font-medium text-slate-500"><%= run.filteredCount %></span> filtered<% } %>
+        <% if (run.blacklistedCount > 0) { %>· <span class="font-medium text-gray-500"><%= run.blacklistedCount %></span> blacklisted<% } %>
+      </span>
+      <span class="text-xs text-gray-400"><%= totalJobs %> logged</span>
+    </div>
+  </summary>
+
+  <!-- Expanded content -->
+  <div class="border-t border-gray-100">
+
+    <% if (run.error_log) { %>
+    <div class="px-5 py-3 bg-red-50 border-b border-red-100">
+      <p class="text-xs text-red-600 font-medium">Error log:</p>
+      <pre class="text-xs text-red-500 mt-1 whitespace-pre-wrap"><%= run.error_log %></pre>
+    </div>
+    <% } %>
+
+    <% if (run.countryGroups.length === 0) { %>
+    <div class="px-5 py-8 text-center text-sm text-gray-400">
+      No job logs for this run.
+      <% if (run.status === 'running') { %>
+      <span class="block mt-1 text-xs">Run is still in progress.</span>
+      <% } %>
+    </div>
+    <% } else { %>
+
+    <% run.countryGroups.forEach(group => { %>
+    <div>
+      <!-- Country header -->
+      <div class="px-5 py-2.5 bg-gray-50 border-b border-gray-100 sticky top-0">
+        <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide"><%= group.country %></h3>
+      </div>
+
+      <!-- Job rows -->
+      <table class="w-full">
+        <tbody class="divide-y divide-gray-50">
+          <% group.jobs.forEach(job => {
+            const jdt = fmtDate(job.logged_at);
+          %>
+          <tr class="hover:bg-gray-50 transition-colors">
+            <!-- Date/time -->
+            <td class="px-5 py-2.5 text-xs text-gray-400 whitespace-nowrap w-0">
+              <span class="block"><%= jdt.date %></span>
+              <span class="block text-gray-300"><%= jdt.time %></span>
+            </td>
+            <!-- Company -->
+            <td class="px-3 py-2.5 text-sm text-gray-600 whitespace-nowrap w-0 max-w-[160px] truncate">
+              <%= job.company %>
+            </td>
+            <!-- Job title -->
+            <td class="px-3 py-2.5 text-sm text-gray-900">
+              <% if (job.internal_job_id) { %>
+                <a href="/job/<%= job.internal_job_id %>" class="hover:text-blue-600 transition-colors"><%= job.title %></a>
+              <% } else { %>
+                <%= job.title %>
+              <% } %>
+            </td>
+            <!-- External link -->
+            <td class="px-3 py-2.5 text-xs w-0 whitespace-nowrap">
+              <% if (job.url) { %>
+                <a href="<%= job.url %>" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:underline">link</a>
+              <% } else { %>
+                <span class="text-gray-300">—</span>
+              <% } %>
+            </td>
+            <!-- Resolution chip -->
+            <td class="pl-3 pr-5 py-2.5 text-right w-0 whitespace-nowrap">
+              <% if (job.internal_job_id) { %>
+              <button class="verdict-btn cursor-pointer" data-job-id="<%= job.internal_job_id %>" data-verdict="<%= job.ai_verdict %>" data-chip-style="full" title="Click to change status">
+                <%- verdictChip(job.ai_verdict, job.rejection_category) %>
+              </button>
+              <% } else { %>
+              <%- verdictChip(job.ai_verdict, job.rejection_category) %>
+              <% } %>
+            </td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <% }); %>
+
+    <% } %>
+
+    <!-- Run footer -->
+    <div class="px-5 py-2.5 border-t border-gray-100 text-xs text-gray-400 flex items-center justify-between">
+      <span>Run #<%= run.id %></span>
+      <% if (run.duration_ms) { %>
+      <span><%= (run.duration_ms / 1000).toFixed(1) %>s</span>
+      <% } %>
+    </div>
+
+  </div>
+</details>
+
+<% }); %>
+</div>
+<% } %>

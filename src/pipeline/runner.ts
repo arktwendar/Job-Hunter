@@ -1,0 +1,444 @@
+/**
+ * Pipeline Runner — Orchestrates the full daily job-hunting pipeline.
+ * Sequence: for each group → fetch → blacklist filter → provider dedup → AI score
+ *           → semantic dedup → store. Then: send email → update run log.
+ * All evaluated jobs (blacklisted + scored) are logged to run_job_logs per run.
+ */
+
+import { getDb, type SettingsRow, type SearchGroupRow, type BlacklistedCompanyRow } from '../db';
+import { config } from '../config';
+import { fetchJobs, type JobPosting } from './fetcher';
+import { filterNewJobs } from './deduplicator';
+import { scoreJobs, dedupAndSummarise, type ScoredJob, type ExistingJob } from './aiScorer';
+import { sendDailyReport, type RunStats } from './emailReport';
+
+function matchesTitleFilter(title: string, filter: string): boolean {
+  const titleWords = new Set(title.toLowerCase().split(/\W+/).filter(Boolean));
+  return filter
+    .split('\n')
+    .map((l) => l.trim().toLowerCase())
+    .filter(Boolean)
+    .some((line) => line.split(/\W+/).filter(Boolean).every((w) => titleWords.has(w)));
+}
+
+let isRunning = false;
+let lastRunResult: PipelineResult | null = null;
+
+export function getIsRunning(): boolean {
+  return isRunning;
+}
+
+export function getRunStatus(): { isRunning: boolean; lastRun: PipelineResult | null } {
+  return { isRunning, lastRun: lastRunResult };
+}
+
+export interface PipelineResult {
+  ranAt: string;
+  durationMs: number;
+  jobsFetched: number;
+  jobsScored: number;
+  jobsStrongMatch: number;
+  jobsWeakMatch: number;
+  jobsNoMatch: number;
+  jobsDuplicate: number;
+  status: 'success' | 'partial_error' | 'failed' | 'running';
+  errorLog: string | null;
+  trigger: 'scheduled' | 'manual';
+}
+
+export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled'): Promise<PipelineResult> {
+  if (isRunning) {
+    console.log('[runner] Pipeline already running; skipping trigger.');
+    return {
+      ranAt: new Date().toISOString(),
+      durationMs: 0,
+      jobsFetched: 0,
+      jobsScored: 0,
+      jobsStrongMatch: 0,
+      jobsWeakMatch: 0,
+      jobsNoMatch: 0,
+      jobsDuplicate: 0,
+      status: 'failed',
+      errorLog: 'Pipeline already running',
+      trigger,
+    };
+  }
+
+  isRunning = true;
+  const startedAt = Date.now();
+  const ranAt = new Date().toISOString();
+  const errors: string[] = [];
+  let runId: number | null = null;
+
+  let jobsFetched = 0;
+  let jobsScored = 0;
+  let jobsStrongMatch = 0;
+  let jobsWeakMatch = 0;
+  let jobsNoMatch = 0;
+  let jobsDuplicate = 0;
+
+  try {
+    const db = getDb();
+
+    // Load global settings (model, email)
+    const settings = db.prepare('SELECT * FROM settings WHERE id = 1').get() as SettingsRow;
+    if (!settings) throw new Error('Settings not found in database');
+
+    // Resolve API keys: DB value takes priority, env vars are fallback
+    const apifyToken = settings.apify_api_token || config.apifyApiToken;
+    const openAiKey = settings.openai_api_key || config.openAiKey;
+    const resendApiKey = settings.resend_api_key || config.resendApiKey;
+    const emailFrom = settings.email_from || config.emailFrom;
+
+    // Load all search groups
+    const groups = db.prepare('SELECT * FROM search_groups ORDER BY id ASC').all() as SearchGroupRow[];
+    if (groups.length === 0) throw new Error('No roles configured. Add at least one role in Settings.');
+
+    // Load blacklist
+    const blacklist = db
+      .prepare('SELECT * FROM blacklisted_companies ORDER BY company_name ASC')
+      .all() as BlacklistedCompanyRow[];
+    const blacklistNames = new Set(blacklist.map((b) => b.company_name.toLowerCase().trim()));
+
+    console.log(`[runner] Starting pipeline (${trigger}) — ${groups.length} group(s), ${blacklist.length} blacklisted company(ies)`);
+
+    // Insert search_runs row NOW to get a stable run_id for job logs
+    runId = db.prepare(
+      `INSERT INTO search_runs (ran_at, status, trigger) VALUES (?, 'running', ?)`
+    ).run(ranAt, trigger).lastInsertRowid as number;
+
+    console.log(`[runner] Run ID: ${runId}`);
+
+    // Prepared statements (shared across groups)
+    const insertJob = db.prepare(`
+      INSERT OR IGNORE INTO jobs (
+        linkedin_job_id, title, company, location, work_mode, description,
+        url, posted_date, fetched_at, ai_score, ai_rationale, ai_summary, ai_verdict,
+        is_duplicate, duplicate_of_job_id, seen, seen_at, group_id, rejection_category
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const insertJobLog = db.prepare(`
+      INSERT INTO run_job_logs (
+        run_id, group_id, linkedin_job_id, title, company, location, url,
+        ai_score, ai_verdict, ai_rationale, rejection_category, logged_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    // In-memory dedup set — prevents re-scoring the same linkedin_job_id within a single run
+    // (NO_MATCH jobs are never written to DB, so filterNewJobs alone can't catch within-run dupes)
+    const seenInRunJobIds = new Set<string>();
+
+    // --- Per-group loop ---
+    for (const group of groups) {
+      if (!group.is_active) {
+        console.log(`[runner] Group ${group.id} is inactive, skipping.`);
+        continue;
+      }
+
+      const keywords: string[] = JSON.parse(group.keywords);
+      const locations: string[] = JSON.parse(group.locations);
+      const workModes: string[] = JSON.parse(group.work_modes);
+
+      console.log(
+        `[runner] Group ${group.id} [${locations.join(', ')}]: ${keywords.length} keywords × ${locations.length} locations`,
+      );
+
+      // 1. Fetch
+      let allFetched: JobPosting[] = [];
+      try {
+        allFetched = await fetchJobs({
+          keywords,
+          locations,
+          workModes,
+          jobType: group.job_type,
+        }, apifyToken);
+      } catch (err) {
+        const msg = `Group ${group.id} fetch error: ${(err as Error).message}`;
+        console.error('[runner]', msg);
+        errors.push(msg);
+        continue;
+      }
+
+      jobsFetched += allFetched.length;
+      console.log(`[runner] Group ${group.id}: fetched ${allFetched.length} jobs`);
+
+      // 2. Title filter
+      if (group.title_filter && group.title_filter.trim()) {
+        const titleFiltered = allFetched.filter((j) => !matchesTitleFilter(j.title, group.title_filter));
+        allFetched = allFetched.filter((j) => matchesTitleFilter(j.title, group.title_filter));
+        console.log(`[runner] Group ${group.id}: title filter removed ${titleFiltered.length} jobs (${allFetched.length} remain)`);
+
+        if (titleFiltered.length > 0) {
+          const loggedAt = new Date().toISOString();
+          db.transaction(() => {
+            for (const job of titleFiltered) {
+              insertJobLog.run(
+                runId, group.id, job.jobId, job.title, job.company,
+                job.location || null, job.url || null,
+                null, 'FILTERED', null, null, loggedAt,
+              );
+            }
+          });
+        }
+      }
+
+      // 3. Blacklist filter — capture filtered jobs before removing them
+      const blacklistedJobs = allFetched.filter((j) => blacklistNames.has(j.company.toLowerCase().trim()));
+      allFetched = allFetched.filter((j) => !blacklistNames.has(j.company.toLowerCase().trim()));
+      if (blacklistedJobs.length > 0) {
+        console.log(`[runner] Group ${group.id}: removed ${blacklistedJobs.length} blacklisted job(s)`);
+      }
+
+      // 3a. Within-run dedup — deduplicate within this batch first, then against earlier groups
+      // The LinkedIn API can return the same jobId multiple times within one group's results
+      const seenInBatch = new Set<string>();
+      const batchDupes: typeof allFetched = [];
+      const batchUnique: typeof allFetched = [];
+      for (const j of allFetched) {
+        if (seenInBatch.has(j.jobId)) batchDupes.push(j);
+        else { seenInBatch.add(j.jobId); batchUnique.push(j); }
+      }
+      allFetched = batchUnique;
+
+      const withinRunDupes = [
+        ...batchDupes,
+        ...allFetched.filter((j) => seenInRunJobIds.has(j.jobId)),
+      ];
+      allFetched = allFetched.filter((j) => !seenInRunJobIds.has(j.jobId));
+      for (const j of allFetched) seenInRunJobIds.add(j.jobId);
+      if (withinRunDupes.length > 0) {
+        console.log(`[runner] Group ${group.id}: ${withinRunDupes.length} within-run duplicate(s) skipped`);
+        jobsDuplicate += withinRunDupes.length;
+        const loggedAt = new Date().toISOString();
+        db.transaction(() => {
+          for (const job of withinRunDupes) {
+            insertJobLog.run(
+              runId, group.id, job.jobId, job.title, job.company,
+              job.location || null, job.url || null,
+              null, 'DUPLICATE', null, null, loggedAt,
+            );
+          }
+        });
+      }
+
+      // 3b. Provider-level dedup — filter jobs already stored in DB from previous runs
+      const { newJobs, providerDupes } = filterNewJobs(allFetched);
+      console.log(`[runner] Group ${group.id}: ${newJobs.length} new after provider dedup`);
+
+      if (providerDupes.length > 0) {
+        jobsDuplicate += providerDupes.length;
+        const loggedAt = new Date().toISOString();
+        db.transaction(() => {
+          for (const job of providerDupes) {
+            insertJobLog.run(
+              runId, group.id, job.jobId, job.title, job.company,
+              job.location || null, job.url || null,
+              null, 'DUPLICATE', null, null, loggedAt,
+            );
+          }
+        });
+      }
+
+      // 4. Score all new jobs (Call 1: scoring)
+      const scoringSettings: SettingsRow = {
+        ...settings,
+        ai_system_prompt: group.ai_system_prompt,
+        score_no_match_max: group.score_no_match_max,
+        score_weak_match_max: group.score_weak_match_max,
+        score_strong_match_min: group.score_strong_match_min,
+      };
+
+      let scoredJobs: ScoredJob[] = [];
+      if (newJobs.length > 0) {
+        scoredJobs = await scoreJobs(newJobs, scoringSettings, openAiKey);
+        jobsScored += scoredJobs.length;
+      }
+
+      // 4b. Dedup + summary for strong matches (Call 2: dedup + summary)
+      const jobResults: Array<{
+        scored: ScoredJob;
+        isDuplicate: boolean;
+        duplicateOfId: number | null;
+        summary: string | null;
+      }> = [];
+
+      for (const scored of scoredJobs) {
+        let isDuplicate = false;
+        let duplicateOfId: number | null = null;
+        let summary: string | null = null;
+
+        if (scored.verdict === 'STRONG_MATCH') {
+          const existingJobs = db.prepare(`
+            SELECT id, title, description FROM jobs
+            WHERE lower(company) = lower(?) AND lower(title) = lower(?)
+              AND is_duplicate = 0 AND ai_verdict = 'STRONG_MATCH'
+            ORDER BY fetched_at DESC LIMIT 5
+          `).all(scored.job.company, scored.job.title) as ExistingJob[];
+
+          const dedup = await dedupAndSummarise(scored, existingJobs, settings, openAiKey);
+          isDuplicate = dedup.isDuplicate;
+          duplicateOfId = dedup.duplicateOfId;
+          summary = dedup.summary;
+
+          if (isDuplicate) {
+            console.log(`[runner] Semantic duplicate: "${scored.job.title}" at "${scored.job.company}" → original ID ${duplicateOfId}`);
+          }
+        }
+
+        if (isDuplicate) jobsDuplicate++;
+        else if (scored.verdict === 'STRONG_MATCH') jobsStrongMatch++;
+        else if (scored.verdict === 'WEAK_MATCH') jobsWeakMatch++;
+        else jobsNoMatch++;
+
+        jobResults.push({ scored, isDuplicate, duplicateOfId, summary });
+      }
+
+      console.log(
+        `[runner] Group ${group.id}: scored ${scoredJobs.length} — Strong=${jobsStrongMatch} Weak=${jobsWeakMatch} NoMatch=${jobsNoMatch} Dupes=${jobsDuplicate} (cumulative)`,
+      );
+
+      // 5. Log all jobs from this group to run_job_logs
+      const loggedAt = new Date().toISOString();
+      db.transaction(() => {
+        for (const job of blacklistedJobs) {
+          insertJobLog.run(
+            runId, group.id, job.jobId, job.title, job.company,
+            job.location || null, job.url || null,
+            null, 'BLACKLISTED', null, null, loggedAt,
+          );
+        }
+        for (const { scored, isDuplicate } of jobResults) {
+          const logVerdict = isDuplicate ? 'DUPLICATE' : scored.verdict;
+          insertJobLog.run(
+            runId, group.id, scored.job.jobId, scored.job.title, scored.job.company,
+            scored.job.location || null, scored.job.url || null,
+            scored.score, logVerdict, scored.rationale || null,
+            scored.rejectionCategory || null, loggedAt,
+          );
+        }
+      });
+
+      // Store blacklisted jobs in jobs table (INSERT OR IGNORE — first encounter wins)
+      if (blacklistedJobs.length > 0) {
+        const now = new Date().toISOString();
+        db.transaction(() => {
+          for (const job of blacklistedJobs) {
+            insertJob.run(
+              job.jobId, job.title, job.company,
+              job.location || null, job.workMode || null, job.description || '',
+              job.url || null, job.postedDate || null, now,
+              0, null, null, 'BLACKLISTED',
+              0, null, 0, null,
+              group.id, null,
+            );
+          }
+        });
+        console.log(`[runner] Group ${group.id}: stored ${blacklistedJobs.length} blacklisted job(s).`);
+      }
+
+      // 6. Store all scored jobs (strong/weak/no-match/duplicate) in one pass
+      if (jobResults.length > 0) {
+        const now = new Date().toISOString();
+        db.transaction(() => {
+          for (const { scored, isDuplicate, duplicateOfId, summary } of jobResults) {
+            const { job } = scored;
+            insertJob.run(
+              job.jobId, job.title, job.company,
+              job.location || null, job.workMode || null, job.description || '',
+              job.url || null, job.postedDate || null, now,
+              scored.score, scored.rationale || null,
+              summary || null,
+              scored.verdict,
+              isDuplicate ? 1 : 0, duplicateOfId || null,
+              isDuplicate ? 1 : 0, isDuplicate ? now : null,
+              group.id, scored.rejectionCategory || null,
+            );
+          }
+        });
+        console.log(`[runner] Group ${group.id}: stored ${jobResults.length} jobs.`);
+      }
+    }
+
+    // 7. Send email report
+    const emailStats: RunStats = {
+      jobsFetched,
+      jobsScored,
+      strongMatch: jobsStrongMatch,
+      weakMatch: jobsWeakMatch,
+      noMatch: jobsNoMatch,
+      duplicates: jobsDuplicate,
+    };
+
+    if (settings.email_enabled !== 0) {
+      try {
+        await sendDailyReport(emailStats, settings.email_recipient, resendApiKey, emailFrom);
+      } catch (err) {
+        const msg = `Email send error: ${(err as Error).message}`;
+        console.error('[runner]', msg);
+        errors.push(msg);
+      }
+    } else {
+      console.log('[runner] Email sending is disabled in settings. Skipping email report.');
+    }
+
+    // 8. Update the run row with final stats
+    const durationMs = Date.now() - startedAt;
+    const status = errors.length === 0 ? 'success' : 'partial_error';
+
+    db.prepare(`
+      UPDATE search_runs SET
+        jobs_fetched = ?, jobs_scored = ?, jobs_strong_match = ?,
+        jobs_weak_match = ?, jobs_no_match = ?, jobs_duplicate = ?,
+        status = ?, error_log = ?, duration_ms = ?
+      WHERE id = ?
+    `).run(
+      jobsFetched, jobsScored, jobsStrongMatch,
+      jobsWeakMatch, jobsNoMatch, jobsDuplicate,
+      status, errors.length > 0 ? errors.join('\n') : null, durationMs,
+      runId,
+    );
+
+    console.log(`[runner] Pipeline complete in ${durationMs}ms — Status: ${status} (${trigger})`);
+
+    const result: PipelineResult = {
+      ranAt, durationMs, jobsFetched, jobsScored,
+      jobsStrongMatch, jobsWeakMatch, jobsNoMatch, jobsDuplicate,
+      status, errorLog: errors.length > 0 ? errors.join('\n') : null, trigger,
+    };
+    lastRunResult = result;
+    return result;
+
+  } catch (err) {
+    const durationMs = Date.now() - startedAt;
+    const errorMsg = (err as Error).message;
+    console.error('[runner] Fatal pipeline error:', errorMsg);
+
+    try {
+      const db = getDb();
+      if (runId !== null) {
+        db.prepare(
+          `UPDATE search_runs SET status = 'failed', error_log = ?, duration_ms = ? WHERE id = ?`
+        ).run(errorMsg, durationMs, runId);
+      } else {
+        // run_id was never created (e.g. DB unavailable at start); fall back to insert
+        db.prepare(`
+          INSERT INTO search_runs (ran_at, jobs_fetched, jobs_scored, jobs_strong_match,
+            jobs_weak_match, jobs_no_match, jobs_duplicate, status, error_log, duration_ms, trigger)
+          VALUES (?, 0, 0, 0, 0, 0, 0, 'failed', ?, ?, ?)
+        `).run(ranAt, errorMsg, durationMs, trigger);
+      }
+    } catch (_) { /* ignore DB logging failure */ }
+
+    const result: PipelineResult = {
+      ranAt, durationMs, jobsFetched: 0, jobsScored: 0,
+      jobsStrongMatch: 0, jobsWeakMatch: 0, jobsNoMatch: 0, jobsDuplicate: 0,
+      status: 'failed', errorLog: errorMsg, trigger,
+    };
+    lastRunResult = result;
+    return result;
+
+  } finally {
+    isRunning = false;
+  }
+}
