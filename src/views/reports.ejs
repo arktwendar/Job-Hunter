@@ -20,21 +20,21 @@ function statusLabel(status) {
 
 function verdictChip(verdict, rejectionCategory) {
   if (verdict === 'STRONG_MATCH')
-    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 whitespace-nowrap">✅ Strong fit ▾</span>';
+    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 whitespace-nowrap">✅ Strong fit</span>';
   if (verdict === 'WEAK_MATCH')
-    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 whitespace-nowrap">⚠️ Weak fit ▾</span>';
+    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 whitespace-nowrap">⚠️ Weak fit</span>';
   if (verdict === 'BLACKLISTED')
     return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 whitespace-nowrap">🚫 Blacklisted</span>';
   if (verdict === 'DUPLICATE')
-    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-600 whitespace-nowrap">🔁 Duplicate ▾</span>';
+    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-600 whitespace-nowrap">🔁 Duplicate</span>';
   if (verdict === 'FILTERED')
     return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500 whitespace-nowrap">✂ Filtered</span>';
   if (verdict === 'NO_MATCH') {
     if (rejectionCategory === 'NO_VISA_SPONSORSHIP')
-      return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 whitespace-nowrap">❌ No visa support ▾</span>';
+      return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 whitespace-nowrap">❌ No visa support</span>';
     if (rejectionCategory === 'PROFILE_MISMATCH')
-      return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 whitespace-nowrap">❌ Profile mismatch ▾</span>';
-    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 whitespace-nowrap">❌ No fit ▾</span>';
+      return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 whitespace-nowrap">❌ Profile mismatch</span>';
+    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 whitespace-nowrap">❌ No fit</span>';
   }
   return '';
 }
@@ -162,13 +162,7 @@ function verdictChip(verdict, rejectionCategory) {
             </td>
             <!-- Resolution chip -->
             <td class="pl-3 pr-5 py-2.5 text-right w-0 whitespace-nowrap">
-              <% if (job.internal_job_id) { %>
-              <button class="verdict-btn cursor-pointer" data-job-id="<%= job.internal_job_id %>" data-verdict="<%= job.ai_verdict %>" data-chip-style="full" title="Click to change status">
-                <%- verdictChip(job.ai_verdict, job.rejection_category) %>
-              </button>
-              <% } else { %>
               <%- verdictChip(job.ai_verdict, job.rejection_category) %>
-              <% } %>
             </td>
           </tr>
           <% }); %>

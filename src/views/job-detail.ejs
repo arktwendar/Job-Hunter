@@ -10,11 +10,34 @@ function formatDate(iso) {
 }
 %>
 
-<!-- Back link -->
-<a href="<%= backUrl %>" class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-6 transition-colors">
-  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-  <%= backLabel %>
-</a>
+<!-- Back link + Prev/Next nav -->
+<div class="flex items-center justify-between mb-6 gap-4">
+  <button onclick="history.back()" class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors flex-shrink-0">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+    <%= backLabel %>
+  </button>
+  <% if (prevId !== null || nextId !== null) { %>
+  <div class="flex items-center gap-1">
+    <% if (prevId !== null) { %>
+    <a href="/job/<%= prevId %>?from=<%= from %>" id="nav-prev"
+       class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors" title="Previous (←)">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      Previous
+    </a>
+    <% } %>
+    <% if (prevId !== null && nextId !== null) { %>
+    <span class="text-gray-200 select-none">|</span>
+    <% } %>
+    <% if (nextId !== null) { %>
+    <a href="/job/<%= nextId %>?from=<%= from %>" id="nav-next"
+       class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors" title="Next (→)">
+      Next
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+    </a>
+    <% } %>
+  </div>
+  <% } %>
+</div>
 
 <!-- Job header card -->
 <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
@@ -75,6 +98,13 @@ function formatDate(iso) {
          class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
         View on LinkedIn
+      </a>
+      <% } %>
+      <% if (job.apply_url) { %>
+      <a href="<%= job.apply_url %>" target="_blank"
+         class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+        Apply Directly
       </a>
       <% } %>
       <!-- Applied toggle -->
@@ -157,13 +187,79 @@ function formatDate(iso) {
 <% } %>
 
 <!-- Full description -->
+<%
+const _desc = job.description || '';
+const _isHtml = /<[a-z][\s\S]*?>/i.test(_desc);
+const _safeDesc = _isHtml
+  ? (() => {
+      // Security: strip scripts, styles, inline event handlers and inline styles
+      let html = _desc
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<style[\s\S]*?<\/style>/gi, '')
+        .replace(/\son\w+="[^"]*"/gi, '')
+        .replace(/style="[^"]*"/gi, '');
+
+      if (!/<p\b/i.test(html)) {
+        // Flat structure — Apify sometimes strips <p> tags and uses <br> as separators.
+        // Convert any run of <br> into a paragraph break, then wrap the whole thing.
+        html = '<p>' + html.replace(/(<br\s*\/?>\s*)+/gi, '</p><p>') + '</p>';
+        // Split "<b>Header</b>content" → "<b>Header</b></p><p>content" so headers
+        // get their own paragraph and the following text starts a fresh paragraph.
+        html = html.replace(/(<p>)(<(?:b|strong)>[^<]{2,80}<\/(?:b|strong)>)/gi, '$1$2</p><p>');
+      } else {
+        // Block structure — clean up whitespace artifacts and split inline headers.
+        html = html
+          .replace(/<p>\s*(?:<br\s*\/?>\s*)*<\/p>/gi, '')
+          .replace(/<p>(?:&nbsp;\s*)+<\/p>/gi, '')
+          .replace(/([.!?;])\s*(<(?:strong|b)>[^<]{3,70}<\/(?:strong|b)>)/gi, '$1</p><p>$2');
+      }
+
+      // Remove empty paragraphs left by consecutive breaks or split artifacts
+      return html.replace(/<p>(\s|&nbsp;)*<\/p>/gi, '');
+    })()
+  : null;
+%>
+<style>
+  /* Scoped description styles — NO Tailwind prose class on this div to avoid conflicts. */
+  .jd-html { font-size: 0.875rem; line-height: 1.6; color: #374151; }
+  /* Every block-level element gets a 1em gap above it.
+     margin-bottom stays 0 so gaps come entirely from margin-top (avoids double-spacing). */
+  .jd-html p, .jd-html ul,
+  .jd-html ol                            { margin-top: 1em; margin-bottom: 0; }
+  .jd-html > *:first-child               { margin-top: 0; }
+  .jd-html li                            { margin-top: 0.25em; margin-bottom: 0.25em; }
+  /* Lists need indentation + markers since we dropped prose */
+  .jd-html ul                            { padding-left: 1.5em; list-style-type: disc; }
+  .jd-html ol                            { padding-left: 1.5em; list-style-type: decimal; }
+  /* Real headings — bigger gap before, stick to what follows */
+  .jd-html h1, .jd-html h2,
+  .jd-html h3, .jd-html h4              { margin-top: 1.5em; margin-bottom: 0; font-weight: 600; }
+  .jd-html h1 + *, .jd-html h2 + *,
+  .jd-html h3 + *, .jd-html h4 + *     { margin-top: 0.25em; }
+  /* Bold-only paragraphs (LinkedIn section headers) — bigger gap before, tight below */
+  .jd-html p:has(> strong:only-child),
+  .jd-html p:has(> b:only-child)        { margin-top: 1.5em; margin-bottom: 0; font-weight: 600; }
+  .jd-html p:has(> strong:only-child) + *,
+  .jd-html p:has(> b:only-child) + *   { margin-top: 0.25em; }
+</style>
 <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
   <h2 class="text-base font-semibold text-gray-900 mb-4">Full Job Description</h2>
-  <div class="prose prose-sm max-w-none text-gray-700 leading-relaxed whitespace-pre-wrap text-sm"><%- job.description.replace(/</g, '&lt;').replace(/>/g, '&gt;') %></div>
+  <% if (_isHtml) { %>
+  <div class="jd-html"><%- _safeDesc %></div>
+  <% } else { %>
+  <div class="prose prose-sm max-w-none text-gray-700 leading-relaxed whitespace-pre-wrap text-sm"><%= _desc %></div>
+  <% } %>
 </div>
 
 <script>
 const _jobId = <%= job.id %>;
+
+// Keyboard navigation: ← Previous, → Next
+document.addEventListener('keydown', function(e) {
+  if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+  if (e.key === 'ArrowLeft')  { const a = document.getElementById('nav-prev'); if (a) a.click(); }
+  if (e.key === 'ArrowRight') { const a = document.getElementById('nav-next'); if (a) a.click(); }
+});
 
 let _applied = <%= job.applied ? 'true' : 'false' %>;
 async function toggleApplied() {

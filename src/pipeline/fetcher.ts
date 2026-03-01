@@ -13,7 +13,8 @@ export interface JobPosting {
   company: string;
   location: string;
   workMode: string;
-  url: string;
+  url: string;          // LinkedIn job URL
+  applyUrl: string | null; // External application URL (company site etc.)
   postedDate: string | null;
   postedDateConfidence: 'HIGH' | 'LOW';
   description: string;
@@ -107,9 +108,11 @@ function mapToJobPosting(item: HarvestJob): JobPosting {
   const jobId = String(item.id || item.jobId || '');
   const rawDate = item.postedDate ?? item.listedAt;
   const parsedDate = parsePostedDate(rawDate);
-  const description = item.descriptionText || item.description || item.descriptionHtml || '';
-  const url = item.linkedinUrl || item.applyUrl || item.url
+  const description = item.descriptionHtml || item.descriptionText || item.description || '';
+  const url = item.linkedinUrl || item.url
     || (jobId ? `https://www.linkedin.com/jobs/view/${jobId}/` : '');
+  // applyUrl is the external company-site URL; only stored if it differs from the LinkedIn URL
+  const applyUrl = (item.applyUrl && item.applyUrl !== url) ? item.applyUrl : null;
 
   return {
     jobId,
@@ -118,6 +121,7 @@ function mapToJobPosting(item: HarvestJob): JobPosting {
     location: getLocationText(item.location),
     workMode: normalizeWorkMode(item.workplaceType),
     url,
+    applyUrl,
     postedDate: parsedDate.date,
     postedDateConfidence: parsedDate.confidence,
     description: description.substring(0, 20_000),

@@ -114,8 +114,9 @@ export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled')
       INSERT OR IGNORE INTO jobs (
         linkedin_job_id, title, company, location, work_mode, description,
         url, posted_date, fetched_at, ai_score, ai_rationale, ai_summary, ai_verdict,
-        is_duplicate, duplicate_of_job_id, seen, seen_at, group_id, rejection_category
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        is_duplicate, duplicate_of_job_id, seen, seen_at, group_id, rejection_category,
+        apply_url
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const insertJobLog = db.prepare(`
@@ -291,15 +292,20 @@ export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled')
               ORDER BY fetched_at DESC LIMIT 5
             `).all(scored.job.company, scored.job.title) as ExistingJob[];
 
-            const dedup = await dedupAndSummarise(scored, existingJobs, settings, openAiKey);
-            isDuplicate = dedup.isDuplicate;
-            duplicateOfId = dedup.duplicateOfId;
-            summary = dedup.summary;
+            if (existingJobs.length > 0) {
+              // Call 2: dedup check only — summary was already generated in Call 1
+              const dedup = await dedupAndSummarise(scored, existingJobs, settings, openAiKey);
+              isDuplicate = dedup.isDuplicate;
+              duplicateOfId = dedup.duplicateOfId;
+              if (isDuplicate) {
+                console.log(`[runner] Semantic duplicate: "${scored.job.title}" at "${scored.job.company}" → original ID ${duplicateOfId}`);
+              }
+            }
+            // existingJobs.length === 0 → not a duplicate; skip Call 2 entirely
 
-            if (isDuplicate) {
-              console.log(`[runner] Semantic duplicate: "${scored.job.title}" at "${scored.job.company}" → original ID ${duplicateOfId}`);
-            } else {
+            if (!isDuplicate) {
               seenStrongInRun.add(runKey);
+              summary = scored.summary;  // from Call 1
             }
           }
         }
@@ -349,6 +355,7 @@ export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled')
               0, null, null, 'BLACKLISTED',
               0, null, 0, null,
               group.id, null,
+              job.applyUrl || null,
             );
           }
         });
@@ -371,6 +378,7 @@ export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled')
               isDuplicate ? 1 : 0, duplicateOfId || null,
               isDuplicate ? 1 : 0, isDuplicate ? now : null,
               group.id, scored.rejectionCategory || null,
+              job.applyUrl || null,
             );
           }
         });

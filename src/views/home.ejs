@@ -168,11 +168,11 @@ function statusColor(s) {
           <div class="text-xs text-gray-400">Fetched</div>
         </div>
         <div class="bg-emerald-50 rounded-lg p-2">
-          <div class="text-base font-bold text-emerald-600"><%= lastRun.jobs_strong_match %></div>
+          <div class="text-base font-bold text-emerald-600"><%= liveStrong %></div>
           <div class="text-xs text-gray-400">Strong</div>
         </div>
         <div class="bg-purple-50 rounded-lg p-2">
-          <div class="text-base font-bold text-purple-600"><%= lastRun.jobs_duplicate %></div>
+          <div class="text-base font-bold text-purple-600"><%= liveDuplicate %></div>
           <div class="text-xs text-gray-400">Duplicates</div>
         </div>
       </div>
@@ -206,7 +206,7 @@ function statusColor(s) {
       <% } else { %>
       <ul class="divide-y divide-gray-50">
         <% lastRunJobs.slice(0, 50).forEach(job => { %>
-        <li class="px-5 py-3.5 hover:bg-gray-50 transition-colors cursor-pointer" onclick="location.href='/job/<%= job.id %>?from=home'">
+        <li class="px-5 py-3.5 hover:bg-gray-50 transition-colors cursor-pointer" onclick="homeJobClick(<%= job.id %>)">
           <div class="flex items-center justify-between gap-3">
             <div class="flex-1 min-w-0">
               <p class="text-sm font-medium text-gray-900 truncate"><%= job.title %></p>
@@ -237,6 +237,10 @@ function statusColor(s) {
 
 <script>
 let homeRunPoller = null;
+
+function homeJobClick(id) {
+  location.href = '/job/' + id + '?from=home';
+}
 
 async function preflight() {
   const res = await fetch('/api/preflight');

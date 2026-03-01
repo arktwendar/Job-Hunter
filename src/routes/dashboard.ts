@@ -18,6 +18,16 @@ router.get('/', (_req: Request, res: Response) => {
   // Jobs from the last pipeline run
   const lastRunAt = lastRun?.ran_at ?? null;
 
+  // Live counts — recalculate from jobs table so manual verdict changes are reflected
+  const liveLastRunStats = lastRunAt
+    ? (db.prepare(`
+        SELECT
+          SUM(CASE WHEN ai_verdict = 'STRONG_MATCH' AND is_duplicate = 0 THEN 1 ELSE 0 END) as strong,
+          SUM(CASE WHEN is_duplicate = 1 THEN 1 ELSE 0 END) as duplicate
+        FROM jobs WHERE fetched_at >= ?
+      `).get(lastRunAt) as { strong: number; duplicate: number } | undefined)
+    : undefined;
+
   const lastRunJobs = lastRunAt
     ? (db
         .prepare(
@@ -76,6 +86,8 @@ router.get('/', (_req: Request, res: Response) => {
 
   res.render('home', {
     lastRun,
+    liveStrong:    liveLastRunStats?.strong    ?? lastRun?.jobs_strong_match ?? 0,
+    liveDuplicate: liveLastRunStats?.duplicate ?? lastRun?.jobs_duplicate    ?? 0,
     lastRunJobs,
     newCount: newCount.c,
     seenCount: seenCount.c,
@@ -193,7 +205,26 @@ router.get('/job/:id', (req: Request, res: Response) => {
   const from = String(req.query.from || 'history');
   const backUrl   = from === 'jobs' ? '/jobs' : from === 'home' ? '/' : '/history';
   const backLabel = from === 'jobs' ? 'Back to Jobs Match' : from === 'home' ? 'Back to Start' : 'Back to History';
-  res.render('job-detail', { job, original, duplicatesOfThis, title: job.title, backUrl, backLabel });
+
+  // Prev/Next navigation within the same day's strong matches (jobs & home contexts only)
+  let prevId: number | null = null;
+  let nextId: number | null = null;
+  if (from === 'jobs' || from === 'home') {
+    const day = job.fetched_at ? String(job.fetched_at).slice(0, 10) : null;
+    if (day) {
+      const sameDayIds = db.prepare(`
+        SELECT id FROM jobs
+        WHERE ai_verdict = 'STRONG_MATCH' AND is_duplicate = 0
+          AND strftime('%Y-%m-%d', fetched_at) = ?
+        ORDER BY ai_score DESC, id ASC
+      `).all(day) as Array<{ id: number }>;
+      const idx = sameDayIds.findIndex((r) => r.id === id);
+      if (idx > 0) prevId = sameDayIds[idx - 1].id;
+      if (idx >= 0 && idx < sameDayIds.length - 1) nextId = sameDayIds[idx + 1].id;
+    }
+  }
+
+  res.render('job-detail', { job, original, duplicatesOfThis, title: job.title, backUrl, backLabel, prevId, nextId, from });
 });
 
 export { router as dashboardRouter };

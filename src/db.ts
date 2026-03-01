@@ -313,6 +313,17 @@ function runMigrations(db: Database): void {
     console.warn('[db] Migration (applied/user_notes) failed (non-fatal):', (err as Error).message);
   }
 
+  // v15: add apply_url to jobs if missing
+  try {
+    const cols = db.prepare(`PRAGMA table_info(jobs)`).all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === 'apply_url')) {
+      db.exec(`ALTER TABLE jobs ADD COLUMN apply_url TEXT`);
+      console.log('[db] Migration applied: jobs.apply_url column added');
+    }
+  } catch (err) {
+    console.warn('[db] Migration (apply_url column) failed (non-fatal):', (err as Error).message);
+  }
+
   // v8: seed default search group from settings row if groups table is empty
   try {
     const groupCount = (
@@ -530,6 +541,7 @@ export interface JobRow {
   group_id: number | null;
   applied: number;
   user_notes: string | null;
+  apply_url: string | null;
 }
 
 export interface SearchRunRow {
