@@ -129,6 +129,13 @@ export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled')
     // (NO_MATCH jobs are never written to DB, so filterNewJobs alone can't catch within-run dupes)
     const seenInRunJobIds = new Set<string>();
 
+    // Tracks strong matches already claimed this run by company+title (lowercased).
+    // Catches jobs that LinkedIn lists under multiple different IDs for the same posting —
+    // they bypass linkedin_job_id dedup but would be missed by semantic dedup because
+    // the first copy isn't stored yet when the second one's Call 2 query runs.
+    // Persists across groups so cross-group same-run duplicates are also caught.
+    const seenStrongInRun = new Set<string>();
+
     // --- Per-group loop ---
     for (const group of groups) {
       if (!group.is_active) {
@@ -269,20 +276,31 @@ export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled')
         let summary: string | null = null;
 
         if (scored.verdict === 'STRONG_MATCH') {
-          const existingJobs = db.prepare(`
-            SELECT id, title, description FROM jobs
-            WHERE lower(company) = lower(?) AND lower(title) = lower(?)
-              AND is_duplicate = 0 AND ai_verdict = 'STRONG_MATCH'
-            ORDER BY fetched_at DESC LIMIT 5
-          `).all(scored.job.company, scored.job.title) as ExistingJob[];
+          const runKey = `${scored.job.company.toLowerCase()}|||${scored.job.title.toLowerCase()}`;
 
-          const dedup = await dedupAndSummarise(scored, existingJobs, settings, openAiKey);
-          isDuplicate = dedup.isDuplicate;
-          duplicateOfId = dedup.duplicateOfId;
-          summary = dedup.summary;
+          if (seenStrongInRun.has(runKey)) {
+            // Another copy of this company+title already claimed as canonical this run.
+            // Mark as duplicate without burning an AI call.
+            isDuplicate = true;
+            console.log(`[runner] In-run duplicate: "${scored.job.title}" at "${scored.job.company}" (different LinkedIn ID, same posting)`);
+          } else {
+            const existingJobs = db.prepare(`
+              SELECT id, title, description FROM jobs
+              WHERE lower(company) = lower(?) AND lower(title) = lower(?)
+                AND is_duplicate = 0 AND ai_verdict = 'STRONG_MATCH'
+              ORDER BY fetched_at DESC LIMIT 5
+            `).all(scored.job.company, scored.job.title) as ExistingJob[];
 
-          if (isDuplicate) {
-            console.log(`[runner] Semantic duplicate: "${scored.job.title}" at "${scored.job.company}" → original ID ${duplicateOfId}`);
+            const dedup = await dedupAndSummarise(scored, existingJobs, settings, openAiKey);
+            isDuplicate = dedup.isDuplicate;
+            duplicateOfId = dedup.duplicateOfId;
+            summary = dedup.summary;
+
+            if (isDuplicate) {
+              console.log(`[runner] Semantic duplicate: "${scored.job.title}" at "${scored.job.company}" → original ID ${duplicateOfId}`);
+            } else {
+              seenStrongInRun.add(runKey);
+            }
           }
         }
 

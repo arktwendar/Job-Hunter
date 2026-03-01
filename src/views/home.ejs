@@ -212,9 +212,19 @@ function statusColor(s) {
               <p class="text-sm font-medium text-gray-900 truncate"><%= job.title %></p>
               <p class="text-xs text-gray-400 mt-0.5 truncate"><%= job.company %><% if (job.location) { %> · <%= job.location %><% } %></p>
             </div>
-            <span class="inline-block font-bold text-xs score-badge <%= scoreTextColor(job.ai_score) %> px-2 py-0.5 rounded flex-shrink-0">
-              <%= job.ai_score %>%
-            </span>
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <span class="inline-block font-bold text-xs score-badge <%= scoreTextColor(job.ai_score) %> px-2 py-0.5 rounded">
+                <%= job.ai_score %>%
+              </span>
+              <% if (job.url) { %>
+              <a href="<%= job.url %>" target="_blank" rel="noopener noreferrer"
+                 title="View on LinkedIn"
+                 onclick="event.stopPropagation()"
+                 class="text-gray-300 hover:text-gray-500 text-sm transition-colors">↗</a>
+              <% } else { %>
+              <span class="text-gray-200 text-sm">—</span>
+              <% } %>
+            </div>
           </div>
         </li>
         <% }); %>
