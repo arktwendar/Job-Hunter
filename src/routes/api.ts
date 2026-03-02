@@ -488,9 +488,17 @@ router.delete('/groups/:id', (req: Request, res: Response) => {
     return;
   }
 
-  const changes = db.prepare('DELETE FROM search_groups WHERE id = ?').run(id).changes;
-  if (changes === 0) {
-    res.status(404).json({ success: false, error: 'Group not found.' });
+  try {
+    db.transaction(() => {
+      // Orphan any referencing rows (data is preserved, group_id → null)
+      db.prepare('UPDATE jobs SET group_id = NULL WHERE group_id = ?').run(id);
+      db.prepare('UPDATE run_job_logs SET group_id = NULL WHERE group_id = ?').run(id);
+      const changes = db.prepare('DELETE FROM search_groups WHERE id = ?').run(id).changes;
+      if (changes === 0) throw Object.assign(new Error('Group not found.'), { status: 404 });
+    });
+  } catch (err) {
+    const status = (err as { status?: number }).status ?? 500;
+    res.status(status).json({ success: false, error: (err as Error).message });
     return;
   }
 
