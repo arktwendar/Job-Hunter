@@ -441,26 +441,6 @@ router.patch('/groups/:id', (req: Request, res: Response) => {
     return;
   }
 
-  // When activating, check no other active group shares a location
-  if (isActive) {
-    const myLocations: string[] = JSON.parse(existing.locations);
-    const otherActive = db
-      .prepare('SELECT * FROM search_groups WHERE is_active = 1 AND id != ?')
-      .all(id) as import('../db').SearchGroupRow[];
-
-    for (const other of otherActive) {
-      const otherLocations: string[] = JSON.parse(other.locations);
-      const conflict = myLocations.find((loc) => otherLocations.includes(loc));
-      if (conflict) {
-        const label = other.group_name ? `"${other.group_name}"` : `Group ${other.id}`;
-        res.status(409).json({
-          success: false,
-          error: `Another active group (${label}) already uses location "${conflict}". Deactivate it first.`,
-        });
-        return;
-      }
-    }
-  }
 
   db.prepare('UPDATE search_groups SET is_active = ?, updated_at = ? WHERE id = ?').run(
     isActive ? 1 : 0,
