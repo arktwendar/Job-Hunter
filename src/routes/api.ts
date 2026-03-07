@@ -34,9 +34,9 @@ router.get('/preflight', (_req: Request, res: Response) => {
       errors.push('No active Roles configured — add at least one Role in Settings.');
     } else {
       for (const g of activeGroups) {
-        if (!g.ai_system_prompt?.trim()) {
+        if (!g.profile_description?.trim() || !g.scoring_criteria?.trim() || !g.scoring_guide?.trim()) {
           const name = g.group_name ? `"${g.group_name}"` : `#${g.id}`;
-          errors.push(`Role ${name} has no AI scoring prompt — edit the Role in Settings.`);
+          errors.push(`Role ${name} is missing Profile Description, Scoring Criteria, or Scoring Guide — edit the Role in Settings.`);
         }
       }
     }
@@ -275,7 +275,12 @@ interface GroupBody {
   keywords: string[];
   job_type: string;
   work_modes: string[];
-  ai_system_prompt: string;
+  profile_description: string;
+  industries_list: string;
+  other_expectations: string;
+  scoring_criteria: string;
+  scoring_guide: string;
+  no_match_criteria: string;
   title_filter: string;
   score_no_match_max: number;
   score_weak_match_max: number;
@@ -321,7 +326,12 @@ function parseGroupBody(body: unknown): GroupBody {
     keywords,
     job_type: String(b.job_type || 'fullTime'),
     work_modes: workModes,
-    ai_system_prompt: String(b.ai_system_prompt || ''),
+    profile_description: String(b.profile_description || ''),
+    industries_list: String(b.industries_list || ''),
+    other_expectations: String(b.other_expectations || ''),
+    scoring_criteria: String(b.scoring_criteria || ''),
+    scoring_guide: String(b.scoring_guide || ''),
+    no_match_criteria: String(b.no_match_criteria || ''),
     title_filter: String(b.title_filter || '').trim(),
     score_no_match_max: noMatchMax,
     score_weak_match_max: weakMatchMax,
@@ -349,15 +359,20 @@ router.post('/groups', (req: Request, res: Response) => {
     const now = new Date().toISOString();
 
     const result = db.prepare(`
-      INSERT INTO search_groups (group_name, locations, keywords, job_type, work_modes, ai_system_prompt, title_filter, score_no_match_max, score_weak_match_max, score_strong_match_min, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO search_groups (group_name, locations, keywords, job_type, work_modes, ai_system_prompt, profile_description, industries_list, other_expectations, scoring_criteria, scoring_guide, no_match_criteria, title_filter, score_no_match_max, score_weak_match_max, score_strong_match_min, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       body.group_name,
       JSON.stringify(body.locations),
       JSON.stringify(body.keywords),
       body.job_type,
       JSON.stringify(body.work_modes),
-      body.ai_system_prompt,
+      body.profile_description,
+      body.industries_list,
+      body.other_expectations,
+      body.scoring_criteria,
+      body.scoring_guide,
+      body.no_match_criteria,
       body.title_filter,
       body.score_no_match_max,
       body.score_weak_match_max,
@@ -395,7 +410,9 @@ router.put('/groups/:id', (req: Request, res: Response) => {
 
     db.prepare(`
       UPDATE search_groups
-      SET group_name = ?, locations = ?, keywords = ?, job_type = ?, work_modes = ?, ai_system_prompt = ?,
+      SET group_name = ?, locations = ?, keywords = ?, job_type = ?, work_modes = ?,
+          profile_description = ?, industries_list = ?, other_expectations = ?,
+          scoring_criteria = ?, scoring_guide = ?, no_match_criteria = ?,
           title_filter = ?, score_no_match_max = ?, score_weak_match_max = ?, score_strong_match_min = ?, updated_at = ?
       WHERE id = ?
     `).run(
@@ -404,7 +421,12 @@ router.put('/groups/:id', (req: Request, res: Response) => {
       JSON.stringify(body.keywords),
       body.job_type,
       JSON.stringify(body.work_modes),
-      body.ai_system_prompt,
+      body.profile_description,
+      body.industries_list,
+      body.other_expectations,
+      body.scoring_criteria,
+      body.scoring_guide,
+      body.no_match_criteria,
       body.title_filter,
       body.score_no_match_max,
       body.score_weak_match_max,

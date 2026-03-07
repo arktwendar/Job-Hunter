@@ -30,8 +30,10 @@ function verdictChip(verdict, rejectionCategory) {
   if (verdict === 'FILTERED')
     return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500 whitespace-nowrap">✂ Filtered</span>';
   if (verdict === 'NO_MATCH') {
-    if (rejectionCategory === 'NO_VISA_SPONSORSHIP')
+    if (rejectionCategory === 'NO_VISA')
       return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 whitespace-nowrap">❌ No visa support</span>';
+    if (rejectionCategory === 'LANGUAGE_MISMATCH')
+      return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 whitespace-nowrap">❌ Language mismatch</span>';
     if (rejectionCategory === 'PROFILE_MISMATCH')
       return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 whitespace-nowrap">❌ Profile mismatch</span>';
     return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 whitespace-nowrap">❌ No fit</span>';

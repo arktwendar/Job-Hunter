@@ -165,7 +165,7 @@ export async function fetchJobs(filters: SearchFilters, apifyToken: string): Pro
 
   console.log(`[fetcher] Starting Apify actor run — ${filters.keywords.length} keywords × ${filters.locations.length} locations`);
 
-  const run = await client.actor('harvestapi/linkedin-job-search').call(actorInput);
+  const run = await client.actor('harvestapi/linkedin-job-search').call(actorInput, { waitSecs: 900 });
 
   console.log(`[fetcher] Actor run complete (${run.id}), fetching dataset items…`);
 

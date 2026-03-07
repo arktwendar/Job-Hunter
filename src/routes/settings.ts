@@ -38,7 +38,7 @@ router.post('/', (req: Request, res: Response) => {
         updated_at = ?
       WHERE id = 1
     `).run(
-      String(body.ai_model || 'gpt-5.2'),
+      String(body.ai_model || 'gpt-5.4'),
       String(body.dedup_system_prompt || ''),
       String(body.summary_prompt || ''),
       String(body.email_recipient || ''),

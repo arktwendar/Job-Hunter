@@ -9,13 +9,13 @@ import { getDb, type SettingsRow, type SearchGroupRow, type BlacklistedCompanyRo
 import { config } from '../config';
 import { fetchJobs, type JobPosting } from './fetcher';
 import { filterNewJobs } from './deduplicator';
-import { scoreJobs, dedupAndSummarise, type ScoredJob, type ExistingJob } from './aiScorer';
+import { scoreJobs, dedupAndSummarise, buildScoringSystemPrompt, type ScoredJob, type ExistingJob } from './aiScorer';
 import { sendDailyReport, type RunStats } from './emailReport';
 
 function matchesTitleFilter(title: string, filter: string): boolean {
   const titleWords = new Set(title.toLowerCase().split(/\W+/).filter(Boolean));
   return filter
-    .split('\n')
+    .split(',')
     .map((l) => l.trim().toLowerCase())
     .filter(Boolean)
     .some((line) => line.split(/\W+/).filter(Boolean).every((w) => titleWords.has(w)));
@@ -251,7 +251,7 @@ export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled')
       // 4. Score all new jobs (Call 1: scoring)
       const scoringSettings: SettingsRow = {
         ...settings,
-        ai_system_prompt: group.ai_system_prompt,
+        ai_system_prompt: buildScoringSystemPrompt(group, settings),
         score_no_match_max: group.score_no_match_max,
         score_weak_match_max: group.score_weak_match_max,
         score_strong_match_min: group.score_strong_match_min,

@@ -149,7 +149,11 @@ router.get('/', (req: Request, res: Response) => {
       jobs: groupJobs,
     }));
 
-  res.render('jobs', { locationGroups, dateGroups, tabGroups, activeGroupId, activeOthers, orphanCount, total: jobs.length, title: 'Jobs Match' });
+  const totalAll = (db.prepare(
+    `SELECT COUNT(*) as c FROM jobs WHERE ai_verdict = 'STRONG_MATCH' AND is_duplicate = 0`,
+  ).get() as { c: number }).c;
+
+  res.render('jobs', { locationGroups, dateGroups, tabGroups, activeGroupId, activeOthers, orphanCount, total: totalAll, title: 'Jobs Match' });
 });
 
 export { router as jobsRouter };

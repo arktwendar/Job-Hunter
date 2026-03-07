@@ -324,6 +324,60 @@ function runMigrations(db: Database): void {
     console.warn('[db] Migration (apply_url column) failed (non-fatal):', (err as Error).message);
   }
 
+  // v16: add structured prompt fields to settings
+  try {
+    const cols = db.prepare(`PRAGMA table_info(settings)`).all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === 'profile_description')) {
+      db.exec(`ALTER TABLE settings ADD COLUMN profile_description TEXT NOT NULL DEFAULT ''`);
+      console.log('[db] Migration applied: settings.profile_description column added');
+    }
+    if (!cols.some((c) => c.name === 'scoring_criteria')) {
+      db.exec(`ALTER TABLE settings ADD COLUMN scoring_criteria TEXT NOT NULL DEFAULT ''`);
+      console.log('[db] Migration applied: settings.scoring_criteria column added');
+    }
+    if (!cols.some((c) => c.name === 'scoring_guide')) {
+      db.exec(`ALTER TABLE settings ADD COLUMN scoring_guide TEXT NOT NULL DEFAULT ''`);
+      console.log('[db] Migration applied: settings.scoring_guide column added');
+    }
+    if (!cols.some((c) => c.name === 'no_match_criteria')) {
+      db.exec(`ALTER TABLE settings ADD COLUMN no_match_criteria TEXT NOT NULL DEFAULT ''`);
+      console.log('[db] Migration applied: settings.no_match_criteria column added');
+    }
+  } catch (err) {
+    console.warn('[db] Migration (structured prompt settings fields) failed (non-fatal):', (err as Error).message);
+  }
+
+  // v16: add per-group prompt fields to search_groups
+  try {
+    const cols = db.prepare(`PRAGMA table_info(search_groups)`).all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === 'industries_list')) {
+      db.exec(`ALTER TABLE search_groups ADD COLUMN industries_list TEXT NOT NULL DEFAULT ''`);
+      console.log('[db] Migration applied: search_groups.industries_list column added');
+    }
+    if (!cols.some((c) => c.name === 'other_expectations')) {
+      db.exec(`ALTER TABLE search_groups ADD COLUMN other_expectations TEXT NOT NULL DEFAULT ''`);
+      console.log('[db] Migration applied: search_groups.other_expectations column added');
+    }
+    if (!cols.some((c) => c.name === 'profile_description')) {
+      db.exec(`ALTER TABLE search_groups ADD COLUMN profile_description TEXT NOT NULL DEFAULT ''`);
+      console.log('[db] Migration applied: search_groups.profile_description column added');
+    }
+    if (!cols.some((c) => c.name === 'scoring_criteria')) {
+      db.exec(`ALTER TABLE search_groups ADD COLUMN scoring_criteria TEXT NOT NULL DEFAULT ''`);
+      console.log('[db] Migration applied: search_groups.scoring_criteria column added');
+    }
+    if (!cols.some((c) => c.name === 'scoring_guide')) {
+      db.exec(`ALTER TABLE search_groups ADD COLUMN scoring_guide TEXT NOT NULL DEFAULT ''`);
+      console.log('[db] Migration applied: search_groups.scoring_guide column added');
+    }
+    if (!cols.some((c) => c.name === 'no_match_criteria')) {
+      db.exec(`ALTER TABLE search_groups ADD COLUMN no_match_criteria TEXT NOT NULL DEFAULT ''`);
+      console.log('[db] Migration applied: search_groups.no_match_criteria column added');
+    }
+  } catch (err) {
+    console.warn('[db] Migration (search_groups prompt fields) failed (non-fatal):', (err as Error).message);
+  }
+
   // v8: seed default search group from settings row if groups table is empty
   try {
     const groupCount = (
@@ -479,7 +533,7 @@ function seedSettings(db: Database): void {
       email_recipient, email_send_time, updated_at
     ) VALUES (
       1, ?, ?, ?,
-      'fullTime', '0 7 * * *', ?, 'gpt-5.2',
+      'fullTime', '0 7 * * *', ?, 'gpt-5.4',
       ?,
       50, 70, 71,
       '', '07:00', ?
@@ -581,6 +635,10 @@ export interface SettingsRow {
   email_from: string;
   email_enabled: number;  // 1 = send email, 0 = skip
   timezone: string;       // IANA timezone, e.g. 'Europe/London'
+  profile_description: string;
+  scoring_criteria: string;
+  scoring_guide: string;
+  no_match_criteria: string;
   updated_at: string;
 }
 
@@ -619,6 +677,12 @@ export interface SearchGroupRow {
   score_no_match_max: number;
   score_weak_match_max: number;
   score_strong_match_min: number;
+  profile_description: string;
+  industries_list: string;
+  other_expectations: string;
+  scoring_criteria: string;
+  scoring_guide: string;
+  no_match_criteria: string;
   is_active: number;         // 1 = active, 0 = inactive
   created_at: string;
   updated_at: string;
