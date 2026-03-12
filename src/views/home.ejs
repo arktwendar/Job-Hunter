@@ -107,12 +107,12 @@ function statusColor(s) {
       <p class="text-sm text-gray-500 mt-0.5">Fetch LinkedIn jobs, score with AI, send email digest.</p>
     </div>
     <div class="flex items-center gap-2">
-      <button onclick="homeSchedule()"
+      <button id="home-schedule-btn" onclick="homeSchedule()"
               class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors shadow-sm">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
         </svg>
-        Schedule
+        <span data-schedule-label>Schedule</span>
       </button>
       <button id="home-run-btn" onclick="homeRun(this)"
               class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors shadow-sm">
@@ -277,6 +277,11 @@ function clearPreflightErrors() {
 }
 
 async function homeSchedule() {
+  // If schedule is active, show status modal (no preflight needed)
+  if (typeof _scheduleActive !== 'undefined' && _scheduleActive) {
+    handleScheduleClick();
+    return;
+  }
   clearPreflightErrors();
   try {
     const check = await preflight();
@@ -285,7 +290,7 @@ async function homeSchedule() {
     showPreflightErrors(['Could not verify configuration: ' + e.message]);
     return;
   }
-  openScheduleModal();
+  handleScheduleClick();
 }
 
 async function homeRun(btn) {
@@ -298,6 +303,15 @@ async function homeRun(btn) {
     return;
   }
 
+  // Set callback that will be invoked by submitRun() after a successful API call
+  _runCallback = function() {
+    startHomeProgress(btn);
+  };
+
+  openRunModal();
+}
+
+function startHomeProgress(btn) {
   const label = document.getElementById('home-run-label');
   const progress = document.getElementById('home-run-progress');
   const result = document.getElementById('home-run-result');
@@ -313,57 +327,41 @@ async function homeRun(btn) {
   bar.style.width = '2%';
 
   let expectedMs = 90_000;
-  try {
-    const s = await fetch('/api/status');
-    const sd = await s.json();
+  fetch('/api/status').then(s => s.json()).then(sd => {
     const lastDuration = sd.lastRun?.duration_ms ?? sd.lastRun?.durationMs;
     if (lastDuration && lastDuration > 0) expectedMs = lastDuration;
-  } catch (_) {}
+  }).catch(() => {}).finally(() => {
+    const barDurationMs = Math.round(expectedMs * 0.9);
+    requestAnimationFrame(() => {
+      bar.style.transition = `width ${barDurationMs}ms linear`;
+      bar.style.width = '90%';
+    });
 
-  try {
-    const res = await fetch('/api/run', { method: 'POST' });
-    const data = await res.json();
-    if (!data.success) {
-      showRunResult(data.error || 'Failed to start', false);
-      resetRunBtn(btn, label, progress);
-      return;
-    }
-  } catch (e) {
-    showRunResult('Network error', false);
-    resetRunBtn(btn, label, progress);
-    return;
-  }
+    const messages = ['Fetching jobs from LinkedIn…','Scoring jobs with AI…','Running semantic dedup…','Generating summaries…','Sending email report…'];
+    const msgInterval = barDurationMs / messages.length;
+    messages.forEach((msg, i) => { setTimeout(() => { statusText.textContent = msg; }, i * msgInterval); });
 
-  const barDurationMs = Math.round(expectedMs * 0.9);
-  requestAnimationFrame(() => {
-    bar.style.transition = `width ${barDurationMs}ms linear`;
-    bar.style.width = '90%';
+    homeRunPoller = setInterval(async () => {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        if (!data.isRunning && data.lastRun) {
+          clearInterval(homeRunPoller);
+          bar.style.transition = 'width 0.4s ease';
+          bar.style.width = '100%';
+          const r = data.lastRun;
+          const ok = r.status === 'success' || r.status === 'partial_error';
+          const tookSec = r.duration_ms ? ` (${(r.duration_ms / 1000).toFixed(0)}s)` : '';
+          showRunResult(
+            ok ? `Done${tookSec} — fetched ${r.jobs_fetched}, strong matches: ${r.jobs_strong_match}. <a href="/" class="underline font-medium">Refresh</a>` : `Failed: ${r.error_log || 'unknown error'}`,
+            ok,
+          );
+          resetRunBtn(btn, label, progress);
+          if (ok) setTimeout(() => location.reload(), 3000);
+        }
+      } catch (_) {}
+    }, 3000);
   });
-
-  const messages = ['Fetching jobs from LinkedIn…','Scoring jobs with AI…','Running semantic dedup…','Generating summaries…','Sending email report…'];
-  const msgInterval = barDurationMs / messages.length;
-  messages.forEach((msg, i) => { setTimeout(() => { statusText.textContent = msg; }, i * msgInterval); });
-
-  homeRunPoller = setInterval(async () => {
-    try {
-      const res = await fetch('/api/status');
-      const data = await res.json();
-      if (!data.isRunning && data.lastRun) {
-        clearInterval(homeRunPoller);
-        bar.style.transition = 'width 0.4s ease';
-        bar.style.width = '100%';
-        const r = data.lastRun;
-        const ok = r.status === 'success' || r.status === 'partial_error';
-        const tookSec = r.duration_ms ? ` (${(r.duration_ms / 1000).toFixed(0)}s)` : '';
-        showRunResult(
-          ok ? `Done${tookSec} — fetched ${r.jobs_fetched}, strong matches: ${r.jobs_strong_match}. <a href="/" class="underline font-medium">Refresh</a>` : `Failed: ${r.error_log || 'unknown error'}`,
-          ok,
-        );
-        resetRunBtn(btn, label, progress);
-        if (ok) setTimeout(() => location.reload(), 3000);
-      }
-    } catch (_) {}
-  }, 3000);
 }
 
 function showRunResult(msg, success) {

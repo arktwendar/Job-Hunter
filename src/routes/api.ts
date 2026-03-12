@@ -3,7 +3,8 @@
  */
 
 import { Router, type Request, type Response } from 'express';
-import { runPipeline, getIsRunning, getRunStatus } from '../pipeline/runner';
+import { runPipeline, getIsRunning, getRunStatus, type RunOptions } from '../pipeline/runner';
+import type { DateRange } from '../pipeline/fetcher';
 import { sendTestEmail } from '../pipeline/emailReport';
 import { fetchJobs } from '../pipeline/fetcher';
 import { startSchedule, stopSchedule, getScheduleStatus } from '../pipeline/scheduler';
@@ -14,13 +15,14 @@ import { checkOpenAiBalance } from '../utils/openaiBalance';
 const router = Router();
 
 // Pre-flight check — validates everything required to run the pipeline
-router.get('/preflight', (_req: Request, res: Response) => {
+router.get('/preflight', (req: Request, res: Response) => {
   try {
     const db = getDb();
-    const settings = db.prepare('SELECT * FROM settings WHERE id = 1').get() as SettingsRow;
+    const profileId = req.profile.id;
+    const settings = db.prepare('SELECT * FROM settings WHERE profile_id = ?').get(profileId) as SettingsRow;
     const activeGroups = db
-      .prepare('SELECT * FROM search_groups WHERE is_active = 1 ORDER BY id ASC')
-      .all() as SearchGroupRow[];
+      .prepare('SELECT * FROM search_groups WHERE profile_id = ? AND is_active = 1 ORDER BY id ASC')
+      .all(profileId) as SearchGroupRow[];
 
     const errors: string[] = [];
 
@@ -53,29 +55,51 @@ router.get('/preflight', (_req: Request, res: Response) => {
 });
 
 // Trigger a manual pipeline run
-router.post('/run', async (_req: Request, res: Response) => {
-  if (getIsRunning()) {
+router.post('/run', async (req: Request, res: Response) => {
+  const profileId = req.profile.id;
+  if (getIsRunning(profileId)) {
     res.status(409).json({ success: false, error: 'Pipeline is already running.' });
     return;
   }
 
+  const b = req.body as Record<string, unknown>;
+
+  // Parse optional groupIds
+  const groupIds = Array.isArray(b.groupIds)
+    ? (b.groupIds as unknown[]).map((id) => parseInt(String(id), 10)).filter((n) => !isNaN(n))
+    : undefined;
+
+  // Parse optional dateRange
+  let dateRange: DateRange = '24h';
+  if (b.dateRange === '7d') {
+    dateRange = '7d';
+  } else if (b.dateRange && typeof b.dateRange === 'object') {
+    const dr = b.dateRange as Record<string, unknown>;
+    if (typeof dr.from === 'string' && typeof dr.to === 'string') {
+      dateRange = { from: dr.from, to: dr.to };
+    }
+  }
+
+  const runOptions: RunOptions = { groupIds, dateRange };
+
   // Respond immediately, run in background
   res.json({ success: true, message: 'Pipeline started. Check dashboard for results.' });
 
-  runPipeline('manual').catch((err) => {
+  runPipeline('manual', profileId, runOptions).catch((err) => {
     console.error('[api] Manual pipeline run failed:', err);
   });
 });
 
 // Pipeline status (used by Run Now polling)
-router.get('/status', (_req: Request, res: Response) => {
-  const { isRunning, lastRun } = getRunStatus();
+router.get('/status', (req: Request, res: Response) => {
+  const profileId = req.profile.id;
+  const { isRunning, lastRun } = getRunStatus(profileId);
 
   // Also fetch the latest DB run for the dashboard card
   const db = getDb();
   const lastDbRun = db
-    .prepare('SELECT * FROM search_runs ORDER BY ran_at DESC LIMIT 1')
-    .get();
+    .prepare('SELECT * FROM search_runs WHERE profile_id = ? ORDER BY ran_at DESC LIMIT 1')
+    .get(profileId);
 
   res.json({
     isRunning,
@@ -84,10 +108,10 @@ router.get('/status', (_req: Request, res: Response) => {
 });
 
 // Send test email
-router.post('/test-email', async (_req: Request, res: Response) => {
+router.post('/test-email', async (req: Request, res: Response) => {
   try {
     const db = getDb();
-    const settings = db.prepare('SELECT * FROM settings WHERE id = 1').get() as SettingsRow;
+    const settings = db.prepare('SELECT * FROM settings WHERE profile_id = ?').get(req.profile.id) as SettingsRow;
     const resendApiKey = settings.resend_api_key || config.resendApiKey;
     const emailFrom = settings.email_from || config.emailFrom;
     await sendTestEmail(settings.email_recipient, resendApiKey, emailFrom);
@@ -165,17 +189,18 @@ router.post('/test/resend', async (req: Request, res: Response) => {
 });
 
 // Fetch-only preview — runs the Apify actor for all groups, returns raw job list, no scoring/storage
-router.post('/fetch-preview', async (_req: Request, res: Response) => {
-  if (getIsRunning()) {
+router.post('/fetch-preview', async (req: Request, res: Response) => {
+  const profileId = req.profile.id;
+  if (getIsRunning(profileId)) {
     res.status(409).json({ success: false, error: 'Pipeline is already running.' });
     return;
   }
 
   try {
     const db = getDb();
-    const settings = db.prepare('SELECT * FROM settings WHERE id = 1').get() as SettingsRow;
+    const settings = db.prepare('SELECT * FROM settings WHERE profile_id = ?').get(profileId) as SettingsRow;
     const apifyToken = settings.apify_api_token || config.apifyApiToken;
-    const groups = db.prepare('SELECT * FROM search_groups ORDER BY id ASC').all() as SearchGroupRow[];
+    const groups = db.prepare('SELECT * FROM search_groups WHERE profile_id = ? ORDER BY id ASC').all(profileId) as SearchGroupRow[];
     if (groups.length === 0) {
       res.json({ success: true, count: 0, jobs: [] });
       return;
@@ -203,67 +228,79 @@ router.post('/fetch-preview', async (_req: Request, res: Response) => {
 });
 
 // Stats summary for dashboard polling
-router.get('/stats', (_req: Request, res: Response) => {
+router.get('/stats', (req: Request, res: Response) => {
   const db = getDb();
+  const profileId = req.profile.id;
 
-  const totalJobs = (db.prepare('SELECT COUNT(*) as c FROM jobs').get() as { c: number }).c;
+  const totalJobs = (db.prepare('SELECT COUNT(*) as c FROM jobs WHERE profile_id = ?').get(profileId) as { c: number }).c;
   const newJobs = (
-    db.prepare(`SELECT COUNT(*) as c FROM jobs WHERE seen = 0 AND is_duplicate = 0 AND ai_verdict = 'STRONG_MATCH'`).get() as { c: number }
+    db.prepare(`SELECT COUNT(*) as c FROM jobs WHERE profile_id = ? AND seen = 0 AND is_duplicate = 0 AND ai_verdict = 'STRONG_MATCH'`).get(profileId) as { c: number }
   ).c;
-  const lastRun = db.prepare('SELECT * FROM search_runs ORDER BY ran_at DESC LIMIT 1').get();
+  const lastRun = db.prepare('SELECT * FROM search_runs WHERE profile_id = ? ORDER BY ran_at DESC LIMIT 1').get(profileId);
 
-  res.json({ totalJobs, newJobs, lastRun, isRunning: getIsRunning() });
+  res.json({ totalJobs, newJobs, lastRun, isRunning: getIsRunning(profileId) });
 });
 
 // ---- Cron Schedule ----
 
-router.get('/schedule/status', (_req: Request, res: Response) => {
+router.get('/schedule/status', (req: Request, res: Response) => {
   const db = getDb();
-  const settings = db.prepare('SELECT email_send_time, timezone FROM settings WHERE id = 1').get() as Pick<SettingsRow, 'email_send_time' | 'timezone'> | undefined;
+  const profileId = req.profile.id;
+  const settings = db.prepare('SELECT email_send_time, timezone, schedule_date_range, schedule_group_ids, cron_schedule FROM settings WHERE profile_id = ?').get(profileId) as Pick<SettingsRow, 'email_send_time' | 'timezone' | 'schedule_date_range' | 'schedule_group_ids' | 'cron_schedule'> | undefined;
+  const savedGroupIds: number[] = settings?.schedule_group_ids ? JSON.parse(settings.schedule_group_ids) : [];
+  const groups = db.prepare('SELECT id, group_name, is_active FROM search_groups WHERE profile_id = ? ORDER BY id ASC').all(profileId) as Array<{ id: number; group_name: string; is_active: number }>;
   res.json({
     success: true,
-    ...getScheduleStatus(),
+    ...getScheduleStatus(profileId),
     email_send_time: settings?.email_send_time || '07:00',
     timezone: settings?.timezone || 'Asia/Yerevan',
+    schedule_date_range: settings?.schedule_date_range || '24h',
+    schedule_group_ids: savedGroupIds,
+    groups,
   });
 });
 
 router.post('/schedule/start', async (req: Request, res: Response) => {
   const db = getDb();
+  const profileId = req.profile.id;
   const b = req.body as Record<string, unknown>;
 
-  // If time/tz provided in body, save to DB first
   const emailSendTime = String(b.email_send_time || '').trim() || null;
   const timezone = String(b.timezone || '').trim() || null;
+  const scheduleDateRange = (b.schedule_date_range === '7d' ? '7d' : '24h') as '24h' | '7d';
+  // schedule_days: '*' for daily, or '1,3,5' etc. for specific days
+  const scheduleDays = String(b.schedule_days || '*').trim().replace(/[^0-9,*]/g, '') || '*';
+  // group_ids: [] = all active
+  const groupIds: number[] = Array.isArray(b.group_ids)
+    ? (b.group_ids as unknown[]).map((id) => parseInt(String(id), 10)).filter((n) => !isNaN(n))
+    : [];
 
-  if (emailSendTime || timezone) {
-    const updates: string[] = [];
-    const params: unknown[] = [];
-    if (emailSendTime) {
-      const [hStr, mStr] = emailSendTime.split(':');
-      const cronSchedule = `${parseInt(mStr || '0', 10)} ${parseInt(hStr || '7', 10)} * * *`;
-      updates.push('email_send_time = ?', 'cron_schedule = ?');
-      params.push(emailSendTime, cronSchedule);
-    }
-    if (timezone) {
-      updates.push('timezone = ?');
-      params.push(timezone);
-    }
-    updates.push('updated_at = ?');
-    params.push(new Date().toISOString());
-    db.prepare(`UPDATE settings SET ${updates.join(', ')} WHERE id = 1`).run(...params);
+  const updates: string[] = [];
+  const params: unknown[] = [];
+  if (emailSendTime) {
+    updates.push('email_send_time = ?');
+    params.push(emailSendTime);
   }
+  if (timezone) {
+    updates.push('timezone = ?');
+    params.push(timezone);
+  }
+  // Build and save the full cron expression
+  const timeVal = emailSendTime || '07:00';
+  const [hStr, mStr] = timeVal.split(':');
+  const expression = `${parseInt(mStr || '0', 10)} ${parseInt(hStr || '7', 10)} * * ${scheduleDays}`;
+  updates.push('cron_schedule = ?', 'schedule_date_range = ?', 'schedule_group_ids = ?', 'updated_at = ?');
+  params.push(expression, scheduleDateRange, JSON.stringify(groupIds), new Date().toISOString());
+  db.prepare(`UPDATE settings SET ${updates.join(', ')} WHERE profile_id = ?`).run(...params, profileId);
 
-  const settings = db.prepare('SELECT email_send_time, timezone FROM settings WHERE id = 1').get() as Pick<SettingsRow, 'email_send_time' | 'timezone'> | undefined;
-  const [hStr, mStr] = (settings?.email_send_time || '07:00').split(':');
-  const expression = `${parseInt(mStr, 10)} ${parseInt(hStr, 10)} * * *`;
+  const settings = db.prepare('SELECT timezone FROM settings WHERE profile_id = ?').get(profileId) as Pick<SettingsRow, 'timezone'> | undefined;
   const tz = settings?.timezone || 'Asia/Yerevan';
-  startSchedule(expression, tz);
-  res.json({ success: true, expression, timezone: tz });
+  startSchedule(profileId, expression, tz, scheduleDateRange, groupIds);
+  res.json({ success: true, expression, timezone: tz, schedule_date_range: scheduleDateRange, schedule_group_ids: groupIds });
 });
 
-router.post('/schedule/stop', (_req: Request, res: Response) => {
-  stopSchedule();
+router.post('/schedule/stop', (req: Request, res: Response) => {
+  stopSchedule(req.profile.id);
   res.json({ success: true });
 });
 
@@ -339,18 +376,19 @@ function parseGroupBody(body: unknown): GroupBody {
   };
 }
 
-// GET /api/groups — list all groups
-router.get('/groups', (_req: Request, res: Response) => {
+// GET /api/groups — list groups for active profile
+router.get('/groups', (req: Request, res: Response) => {
   const db = getDb();
-  const groups = db.prepare('SELECT * FROM search_groups ORDER BY id ASC').all() as SearchGroupRow[];
+  const groups = db.prepare('SELECT * FROM search_groups WHERE profile_id = ? ORDER BY id ASC').all(req.profile.id) as SearchGroupRow[];
   res.json({ success: true, groups });
 });
 
-// POST /api/groups — create a group
+// POST /api/groups — create a group under active profile
 router.post('/groups', (req: Request, res: Response) => {
   try {
     const db = getDb();
-    const count = (db.prepare('SELECT COUNT(*) as c FROM search_groups').get() as { c: number }).c;
+    const profileId = req.profile.id;
+    const count = (db.prepare('SELECT COUNT(*) as c FROM search_groups WHERE profile_id = ?').get(profileId) as { c: number }).c;
     if (count >= 15) {
       res.status(409).json({ success: false, error: 'Maximum of 15 roles reached.' });
       return;
@@ -359,9 +397,10 @@ router.post('/groups', (req: Request, res: Response) => {
     const now = new Date().toISOString();
 
     const result = db.prepare(`
-      INSERT INTO search_groups (group_name, locations, keywords, job_type, work_modes, ai_system_prompt, profile_description, industries_list, other_expectations, scoring_criteria, scoring_guide, no_match_criteria, title_filter, score_no_match_max, score_weak_match_max, score_strong_match_min, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO search_groups (profile_id, group_name, locations, keywords, job_type, work_modes, ai_system_prompt, profile_description, industries_list, other_expectations, scoring_criteria, scoring_guide, no_match_criteria, title_filter, score_no_match_max, score_weak_match_max, score_strong_match_min, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
+      profileId,
       body.group_name,
       JSON.stringify(body.locations),
       JSON.stringify(body.keywords),
@@ -402,7 +441,7 @@ router.put('/groups/:id', (req: Request, res: Response) => {
     const body = parseGroupBody(req.body);
     const db = getDb();
 
-    const existing = db.prepare('SELECT id FROM search_groups WHERE id = ?').get(id);
+    const existing = db.prepare('SELECT id FROM search_groups WHERE id = ? AND profile_id = ?').get(id, req.profile.id);
     if (!existing) {
       res.status(404).json({ success: false, error: 'Group not found.' });
       return;
@@ -457,12 +496,11 @@ router.patch('/groups/:id', (req: Request, res: Response) => {
   const b = req.body as Record<string, unknown>;
   const isActive = b.is_active === true || b.is_active === 1;
 
-  const existing = db.prepare('SELECT * FROM search_groups WHERE id = ?').get(id) as import('../db').SearchGroupRow | undefined;
+  const existing = db.prepare('SELECT * FROM search_groups WHERE id = ? AND profile_id = ?').get(id, req.profile.id) as import('../db').SearchGroupRow | undefined;
   if (!existing) {
     res.status(404).json({ success: false, error: 'Group not found.' });
     return;
   }
-
 
   db.prepare('UPDATE search_groups SET is_active = ?, updated_at = ? WHERE id = ?').run(
     isActive ? 1 : 0,
@@ -474,7 +512,7 @@ router.patch('/groups/:id', (req: Request, res: Response) => {
   res.json({ success: true, group: updated });
 });
 
-// DELETE /api/groups/:id — delete a group (blocked if it's the last one)
+// DELETE /api/groups/:id — delete a group (blocked if it's the last one for this profile)
 router.delete('/groups/:id', (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) {
@@ -483,9 +521,10 @@ router.delete('/groups/:id', (req: Request, res: Response) => {
   }
 
   const db = getDb();
+  const profileId = req.profile.id;
 
   const count = (
-    db.prepare('SELECT COUNT(*) as c FROM search_groups').get() as { c: number }
+    db.prepare('SELECT COUNT(*) as c FROM search_groups WHERE profile_id = ?').get(profileId) as { c: number }
   ).c;
   if (count <= 1) {
     res.status(409).json({ success: false, error: 'Cannot delete the last role.' });
@@ -497,7 +536,7 @@ router.delete('/groups/:id', (req: Request, res: Response) => {
       // Orphan any referencing rows (data is preserved, group_id → null)
       db.prepare('UPDATE jobs SET group_id = NULL WHERE group_id = ?').run(id);
       db.prepare('UPDATE run_job_logs SET group_id = NULL WHERE group_id = ?').run(id);
-      const changes = db.prepare('DELETE FROM search_groups WHERE id = ?').run(id).changes;
+      const changes = db.prepare('DELETE FROM search_groups WHERE id = ? AND profile_id = ?').run(id, profileId).changes;
       if (changes === 0) throw Object.assign(new Error('Group not found.'), { status: 404 });
     });
   } catch (err) {
@@ -566,9 +605,9 @@ router.patch('/jobs/:id/notes', (req: Request, res: Response) => {
 });
 
 // GET /api/check-openai-balance — check remaining OpenAI credit for the configured key
-router.get('/check-openai-balance', async (_req: Request, res: Response) => {
+router.get('/check-openai-balance', async (req: Request, res: Response) => {
   const db = getDb();
-  const settings = db.prepare('SELECT * FROM settings WHERE id = 1').get() as SettingsRow | undefined;
+  const settings = db.prepare('SELECT * FROM settings WHERE profile_id = ?').get(req.profile.id) as SettingsRow | undefined;
   const apiKey = settings?.openai_api_key || config.openAiKey;
   if (!apiKey) {
     res.json({ success: false, error: 'No OpenAI API key configured in Settings.' });
@@ -586,11 +625,11 @@ router.get('/check-openai-balance', async (_req: Request, res: Response) => {
 // ---- Company Blacklist CRUD ----
 
 // GET /api/blacklist
-router.get('/blacklist', (_req: Request, res: Response) => {
+router.get('/blacklist', (req: Request, res: Response) => {
   const db = getDb();
   const entries = db
-    .prepare('SELECT * FROM blacklisted_companies ORDER BY company_name ASC')
-    .all() as BlacklistedCompanyRow[];
+    .prepare('SELECT * FROM blacklisted_companies WHERE profile_id = ? ORDER BY company_name ASC')
+    .all(req.profile.id) as BlacklistedCompanyRow[];
   res.json({ success: true, entries });
 });
 
@@ -600,6 +639,7 @@ router.post('/blacklist', (req: Request, res: Response) => {
     const b = req.body as Record<string, unknown>;
     const companyName = String(b.company_name || '').trim();
     const notes = String(b.notes || '').trim();
+    const profileId = req.profile.id;
 
     if (!companyName) {
       res.status(400).json({ success: false, error: 'Company name is required.' });
@@ -608,8 +648,8 @@ router.post('/blacklist', (req: Request, res: Response) => {
 
     const db = getDb();
     const result = db
-      .prepare('INSERT INTO blacklisted_companies (company_name, notes, created_at) VALUES (?, ?, ?)')
-      .run(companyName, notes, new Date().toISOString());
+      .prepare('INSERT INTO blacklisted_companies (profile_id, company_name, notes, created_at) VALUES (?, ?, ?, ?)')
+      .run(profileId, companyName, notes, new Date().toISOString());
 
     const created = db
       .prepare('SELECT * FROM blacklisted_companies WHERE id = ?')
@@ -640,8 +680,8 @@ router.put('/blacklist/:id', (req: Request, res: Response) => {
 
     const db = getDb();
     const changes = db
-      .prepare('UPDATE blacklisted_companies SET company_name = ?, notes = ? WHERE id = ?')
-      .run(companyName, notes, id).changes;
+      .prepare('UPDATE blacklisted_companies SET company_name = ?, notes = ? WHERE id = ? AND profile_id = ?')
+      .run(companyName, notes, id, req.profile.id).changes;
 
     if (changes === 0) { res.status(404).json({ success: false, error: 'Entry not found.' }); return; }
 
@@ -663,7 +703,7 @@ router.delete('/blacklist/:id', (req: Request, res: Response) => {
   if (isNaN(id)) { res.status(400).json({ success: false, error: 'Invalid id.' }); return; }
 
   const db = getDb();
-  const changes = db.prepare('DELETE FROM blacklisted_companies WHERE id = ?').run(id).changes;
+  const changes = db.prepare('DELETE FROM blacklisted_companies WHERE id = ? AND profile_id = ?').run(id, req.profile.id).changes;
 
   if (changes === 0) { res.status(404).json({ success: false, error: 'Entry not found.' }); return; }
 

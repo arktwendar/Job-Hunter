@@ -27,9 +27,9 @@ function stripMd(text) {
   </div>
   <div class="inline-flex rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden text-sm">
     <button id="btn-date" onclick="setGrouping('date')"
-            class="px-4 py-2 font-medium text-gray-700 transition-colors">By Date</button>
+            class="px-4 py-2 font-medium text-gray-500 transition-all">By Date</button>
     <button id="btn-location" onclick="setGrouping('location')"
-            class="px-4 py-2 font-medium text-gray-700 border-l border-gray-200 transition-colors">By Location</button>
+            class="px-4 py-2 font-medium text-gray-500 border-l border-gray-200 transition-all">By Location</button>
   </div>
 </div>
 
@@ -260,10 +260,19 @@ function setGrouping(mode) {
   document.getElementById('view-location').classList.toggle('hidden', mode !== 'location');
   const btnDate = document.getElementById('btn-date');
   const btnLoc  = document.getElementById('btn-location');
-  btnDate.classList.toggle('bg-gray-100', mode === 'date');
-  btnDate.classList.toggle('text-gray-900', mode === 'date');
-  btnLoc.classList.toggle('bg-gray-100', mode === 'location');
-  btnLoc.classList.toggle('text-gray-900', mode === 'location');
+  const activeClass = ['text-gray-900', 'font-semibold'];
+  const inactiveClass = ['text-gray-500', 'font-medium'];
+  const activeShadow = 'shadow-[inset_0_-2px_0_#1f2937]';
+  [btnDate, btnLoc].forEach(btn => {
+    btn.classList.remove(...activeClass, ...inactiveClass, activeShadow);
+  });
+  if (mode === 'date') {
+    btnDate.classList.add(...activeClass, activeShadow);
+    btnLoc.classList.add(...inactiveClass);
+  } else {
+    btnLoc.classList.add(...activeClass, activeShadow);
+    btnDate.classList.add(...inactiveClass);
+  }
   try { localStorage.setItem('jobs-grouping', mode); } catch(_) {}
 }
 

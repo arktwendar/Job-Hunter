@@ -1,43 +1,72 @@
 /**
- * Cron Scheduler — start/stop the scheduled pipeline run.
+ * Cron Scheduler — start/stop scheduled pipeline runs, one cron instance per profile.
  * Singleton module so state persists across API requests.
  */
 
 import cron from 'node-cron';
 import { runPipeline } from './runner';
+import type { DateRange } from './fetcher';
 
-let cronJob: ReturnType<typeof cron.schedule> | null = null;
-let activeExpression: string | null = null;
-let activeTimezone: string | null = null;
+interface ScheduleEntry {
+  job: ReturnType<typeof cron.schedule>;
+  expression: string;
+  timezone: string;
+  dateRange: DateRange;
+  groupIds: number[];
+}
 
-export function startSchedule(expression: string, timezone: string): void {
-  stopSchedule();
+const schedules = new Map<number, ScheduleEntry>();
+
+export function startSchedule(
+  profileId: number,
+  expression: string,
+  timezone: string,
+  dateRange: DateRange = '24h',
+  groupIds: number[] = [],
+): void {
+  stopSchedule(profileId);
 
   if (!cron.validate(expression)) {
     console.warn(`[cron] Invalid expression: "${expression}" — using fallback "0 7 * * *"`);
     expression = '0 7 * * *';
   }
 
-  cronJob = cron.schedule(expression, () => {
-    console.log(`[cron] Triggered at ${new Date().toISOString()}`);
-    runPipeline('scheduled').catch((err) => console.error('[cron] Pipeline failed:', err));
+  const job = cron.schedule(expression, () => {
+    console.log(`[cron] Profile ${profileId} triggered at ${new Date().toISOString()}`);
+    runPipeline('scheduled', profileId, {
+      dateRange,
+      groupIds: groupIds.length > 0 ? groupIds : undefined,
+    }).catch((err) =>
+      console.error(`[cron] Profile ${profileId} pipeline failed:`, err),
+    );
   }, { timezone });
 
-  activeExpression = expression;
-  activeTimezone = timezone;
-  console.log(`[cron] Schedule started: "${expression}" (${timezone})`);
+  schedules.set(profileId, { job, expression, timezone, dateRange, groupIds });
+  console.log(`[cron] Profile ${profileId} schedule started: "${expression}" (${timezone})`);
 }
 
-export function stopSchedule(): void {
-  if (cronJob) {
-    cronJob.stop();
-    cronJob = null;
-    activeExpression = null;
-    activeTimezone = null;
-    console.log('[cron] Schedule stopped.');
+export function stopSchedule(profileId: number): void {
+  const entry = schedules.get(profileId);
+  if (entry) {
+    entry.job.stop();
+    schedules.delete(profileId);
+    console.log(`[cron] Profile ${profileId} schedule stopped.`);
   }
 }
 
-export function getScheduleStatus(): { active: boolean; expression: string | null; timezone: string | null } {
-  return { active: cronJob !== null, expression: activeExpression, timezone: activeTimezone };
+export function getScheduleStatus(profileId: number): {
+  active: boolean;
+  expression: string | null;
+  timezone: string | null;
+  dateRange: DateRange | null;
+  groupIds: number[] | null;
+} {
+  const entry = schedules.get(profileId);
+  return {
+    active: !!entry,
+    expression: entry?.expression ?? null,
+    timezone: entry?.timezone ?? null,
+    dateRange: entry?.dateRange ?? null,
+    groupIds: entry?.groupIds ?? null,
+  };
 }

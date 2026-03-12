@@ -1,9 +1,13 @@
 <%
 function fmtDate(iso) {
   if (!iso) return { date: '—', time: '' };
-  // Use UTC to stay consistent with stored timestamps
-  const s = String(iso);
-  return { date: s.slice(0, 10), time: s.slice(11, 16) };
+  const d = new Date(String(iso));
+  if (isNaN(d.getTime())) return { date: String(iso).slice(0, 10), time: '' };
+  const offset = 4 * 60; // GMT+4 in minutes
+  const local = new Date(d.getTime() + offset * 60_000);
+  const date = local.toISOString().slice(0, 10);
+  const time = local.toISOString().slice(11, 16);
+  return { date, time };
 }
 
 function statusBadge(status) {
@@ -44,7 +48,7 @@ function verdictChip(verdict, rejectionCategory) {
 
 <!-- Page header -->
 <div class="mb-8">
-  <h1 class="text-2xl font-bold text-gray-900">Run Reports</h1>
+  <h1 class="text-2xl font-bold text-gray-900">Run Logs</h1>
   <p class="text-sm text-gray-500 mt-1">Full audit log of every pipeline run — showing last <%= runs.length %> run<%= runs.length !== 1 ? 's' : '' %></p>
 </div>
 
@@ -75,7 +79,7 @@ function verdictChip(verdict, rejectionCategory) {
       <div class="flex items-center gap-2">
         <span class="font-semibold text-gray-900 text-sm"><%= dt.date %></span>
         <span class="text-gray-400 text-xs">·</span>
-        <span class="text-gray-500 text-sm"><%= dt.time %> UTC</span>
+        <span class="text-gray-500 text-sm"><%= dt.time %> GMT+4</span>
       </div>
 
       <!-- Status badge -->

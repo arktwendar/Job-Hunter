@@ -28,43 +28,64 @@
 
     <!-- Sidebar -->
     <aside class="w-56 flex-shrink-0 bg-gray-900 text-gray-100 flex flex-col sticky top-0 h-screen">
+
       <!-- Logo -->
-      <div class="px-5 py-5 border-b border-gray-700">
+      <div class="px-5 py-3 border-b border-gray-700">
         <div class="flex items-center gap-2">
           <div class="w-7 h-7 bg-blue-500 rounded-lg flex items-center justify-center text-white text-xs font-bold">JH</div>
           <span class="font-semibold text-sm text-white">Job Hunter</span>
         </div>
       </div>
 
+      <!-- Profile Switcher -->
+      <div class="px-3 py-2 border-b border-gray-700">
+        <div class="flex rounded-lg overflow-hidden bg-gray-800 border border-gray-700 p-0.5 gap-0.5">
+          <form method="POST" action="/api/profile/switch" class="flex-1">
+            <input type="hidden" name="profile_id" value="1" />
+            <button type="submit"
+                    class="w-full text-xs font-semibold py-1.5 rounded-md transition-colors <%= activeProfile.id === 1 ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-200' %>">
+              Mikhail
+            </button>
+          </form>
+          <form method="POST" action="/api/profile/switch" class="flex-1">
+            <input type="hidden" name="profile_id" value="2" />
+            <button type="submit"
+                    class="w-full text-xs font-semibold py-1.5 rounded-md transition-colors <%= activeProfile.id === 2 ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-200' %>">
+              Arina
+            </button>
+          </form>
+        </div>
+      </div>
+
       <!-- Nav -->
       <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         <a href="/"
-           class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium <%= title === 'Start' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' %> transition-colors">
+           class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium <%= title === 'Start' ? 'bg-white/10 text-white shadow-[inset_3px_0_0_rgba(255,255,255,0.55)]' : 'text-gray-400 hover:bg-white/5 hover:text-white' %> transition-colors">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
           Start
         </a>
         <a href="/jobs"
-           class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium <%= title === 'Jobs Match' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' %> transition-colors">
+           class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium <%= title === 'Jobs Match' ? 'bg-white/10 text-white shadow-[inset_3px_0_0_rgba(255,255,255,0.55)]' : 'text-gray-400 hover:bg-white/5 hover:text-white' %> transition-colors">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
           Jobs Match
         </a>
         <a href="/history"
-           class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium <%= title === 'Jobs All' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' %> transition-colors">
+           class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium <%= title === 'Jobs All' ? 'bg-white/10 text-white shadow-[inset_3px_0_0_rgba(255,255,255,0.55)]' : 'text-gray-400 hover:bg-white/5 hover:text-white' %> transition-colors">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
           Jobs All
         </a>
         <a href="/analytics"
-           class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium <%= title === 'Stats' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' %> transition-colors">
+           class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium <%= title === 'Stats' ? 'bg-white/10 text-white shadow-[inset_3px_0_0_rgba(255,255,255,0.55)]' : 'text-gray-400 hover:bg-white/5 hover:text-white' %> transition-colors">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
           Stats
         </a>
         <a href="/reports"
-           class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium <%= title === 'Run Logs' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' %> transition-colors">
+           class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium <%= title === 'Run Logs' ? 'bg-white/10 text-white shadow-[inset_3px_0_0_rgba(255,255,255,0.55)]' : 'text-gray-400 hover:bg-white/5 hover:text-white' %> transition-colors">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
           Run Logs
         </a>
         <a href="/settings"
-           class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium <%= title === 'Settings' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' %> transition-colors">
+           class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium <%= title === 'Settings' ? 'bg-white/10 text-white shadow-[inset_3px_0_0_rgba(255,255,255,0.55)]' : 'text-gray-400 hover:bg-white/5 hover:text-white' %> transition-colors">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
           Settings
         </a>
@@ -73,8 +94,8 @@
       <!-- Bottom action buttons -->
       <div class="px-3 py-4 border-t border-gray-700 space-y-2">
 
-        <!-- Run Once (always visible) -->
-        <button id="sidebar-run-btn" onclick="sidebarRunOnce(this)"
+        <!-- Run Once — opens confirmation modal -->
+        <button id="sidebar-run-btn" onclick="openRunModal()"
                 class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
@@ -83,7 +104,7 @@
           <span id="sidebar-run-label">Run Once</span>
         </button>
 
-        <!-- Schedule: inactive = blue, active = red Stop -->
+        <!-- Schedule: inactive = blue config button, active = pulsing indicator + stop -->
         <div id="schedule-inactive">
           <button onclick="openScheduleModal()"
                   class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
@@ -104,7 +125,7 @@
           <button onclick="scheduleStop()"
                   class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0zM9 10h6v4H9z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118zM9 10h6v4H9z"/>
             </svg>
             Stop Schedule
           </button>
@@ -122,7 +143,7 @@
     </main>
   </div>
 
-  <!-- Confirm modal (replaces browser confirm()) -->
+  <!-- Confirm modal -->
   <div id="jh-confirm-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4">
     <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="_jhConfirmResolve(false)"></div>
     <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
@@ -142,7 +163,7 @@
     </div>
   </div>
 
-  <!-- Alert modal (replaces browser alert()) -->
+  <!-- Alert modal -->
   <div id="jh-alert-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4">
     <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="_jhAlertResolve()"></div>
     <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
@@ -158,7 +179,7 @@
     </div>
   </div>
 
-  <!-- Verdict dropdown (shared across Jobs All + Run Reports) -->
+  <!-- Verdict dropdown -->
   <div id="verdict-dropdown" class="hidden fixed z-50 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden" style="min-width:148px">
     <div class="py-1">
       <button onclick="setVerdict('STRONG_MATCH')" class="w-full text-left px-4 py-2 text-sm hover:bg-emerald-50 text-emerald-700 font-medium">✅ Strong fit</button>
@@ -168,7 +189,7 @@
     </div>
   </div>
 
-  <!-- Schedule Modal -->
+  <!-- Schedule Setup Modal -->
   <div id="schedule-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
     <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeScheduleModal()"></div>
     <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
@@ -178,11 +199,57 @@
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
       </div>
-      <div class="px-6 py-5 space-y-4">
+      <div class="px-6 py-4 space-y-4 max-h-[75vh] overflow-y-auto">
+        <!-- Roles -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1.5">Run daily at</label>
+          <div class="text-sm font-medium text-gray-700 mb-2">Roles to run</div>
+          <div id="sched-modal-groups" class="space-y-1 max-h-36 overflow-y-auto">
+            <span class="text-sm text-gray-400">Loading…</span>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">Run at</label>
           <input id="sched-time-input" type="time" value="07:00"
                  class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <!-- Frequency: daily vs specific days -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">Frequency</label>
+          <div class="flex gap-2 mb-2">
+            <button type="button" id="freq-daily" onclick="setSchedFrequency('daily')"
+                    class="freq-btn flex-1 py-1.5 px-3 rounded-lg border text-sm font-medium transition-colors">
+              Daily
+            </button>
+            <button type="button" id="freq-custom" onclick="setSchedFrequency('custom')"
+                    class="freq-btn flex-1 py-1.5 px-3 rounded-lg border text-sm font-medium transition-colors">
+              Specific days
+            </button>
+          </div>
+          <div id="sched-freq-days" class="hidden">
+            <div class="flex flex-wrap gap-2">
+              <label class="flex items-center gap-1.5 cursor-pointer text-sm text-gray-700 select-none">
+                <input type="checkbox" class="sched-day-check w-3.5 h-3.5 accent-blue-600" value="1" checked> Mon
+              </label>
+              <label class="flex items-center gap-1.5 cursor-pointer text-sm text-gray-700 select-none">
+                <input type="checkbox" class="sched-day-check w-3.5 h-3.5 accent-blue-600" value="2" checked> Tue
+              </label>
+              <label class="flex items-center gap-1.5 cursor-pointer text-sm text-gray-700 select-none">
+                <input type="checkbox" class="sched-day-check w-3.5 h-3.5 accent-blue-600" value="3" checked> Wed
+              </label>
+              <label class="flex items-center gap-1.5 cursor-pointer text-sm text-gray-700 select-none">
+                <input type="checkbox" class="sched-day-check w-3.5 h-3.5 accent-blue-600" value="4" checked> Thu
+              </label>
+              <label class="flex items-center gap-1.5 cursor-pointer text-sm text-gray-700 select-none">
+                <input type="checkbox" class="sched-day-check w-3.5 h-3.5 accent-blue-600" value="5" checked> Fri
+              </label>
+              <label class="flex items-center gap-1.5 cursor-pointer text-sm text-gray-700 select-none">
+                <input type="checkbox" class="sched-day-check w-3.5 h-3.5 accent-blue-600" value="6"> Sat
+              </label>
+              <label class="flex items-center gap-1.5 cursor-pointer text-sm text-gray-700 select-none">
+                <input type="checkbox" class="sched-day-check w-3.5 h-3.5 accent-blue-600" value="0"> Sun
+              </label>
+            </div>
+          </div>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1.5">Timezone</label>
@@ -225,6 +292,19 @@
             <option value="Pacific/Pago_Pago">GMT-11 (Pago Pago)</option>
           </select>
         </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">Search period</label>
+          <div class="flex gap-2">
+            <button type="button" id="sched-dr-24h" onclick="setSchedDateRange('24h')"
+                    class="sched-dr-btn flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-colors">
+              Last 24h
+            </button>
+            <button type="button" id="sched-dr-7d" onclick="setSchedDateRange('7d')"
+                    class="sched-dr-btn flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-colors">
+              Last 7 days
+            </button>
+          </div>
+        </div>
         <p id="sched-modal-msg" class="hidden text-xs"></p>
       </div>
       <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
@@ -241,21 +321,189 @@
     </div>
   </div>
 
+  <!-- Schedule Status Modal (read-only, shown when schedule is active) -->
+  <div id="schedule-status-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeScheduleStatusModal()"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block"></span>
+          <h2 class="font-semibold text-gray-900">Schedule Active</h2>
+        </div>
+        <button onclick="closeScheduleStatusModal()" class="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="px-6 py-5 space-y-3 text-sm">
+        <div class="flex justify-between items-center">
+          <span class="text-gray-500">Frequency</span>
+          <span id="sched-status-freq" class="font-medium text-gray-900"></span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-gray-500">Runs at</span>
+          <span id="sched-status-time" class="font-semibold font-mono text-gray-900"></span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-gray-500">Timezone</span>
+          <span id="sched-status-tz" class="font-medium text-gray-900"></span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-gray-500">Search period</span>
+          <span id="sched-status-dr" class="font-medium text-gray-900"></span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-gray-500">Roles</span>
+          <span id="sched-status-roles" class="font-medium text-gray-900"></span>
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
+        <button onclick="closeScheduleStatusModal()"
+                class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors">
+          Close
+        </button>
+        <button onclick="scheduleStop(); closeScheduleStatusModal();"
+                class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-5 py-2 rounded-xl text-sm transition-colors shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118zM9 10h6v4H9z"/>
+          </svg>
+          Stop Schedule
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Run Once Modal -->
+  <div id="run-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeRunModal()"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+        <h2 class="font-semibold text-gray-900">Run Once</h2>
+        <button onclick="closeRunModal()" class="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="px-6 py-5 space-y-4">
+        <!-- Roles -->
+        <div>
+          <div class="text-sm font-medium text-gray-700 mb-2">Roles to run</div>
+          <div id="run-modal-groups" class="space-y-1 max-h-44 overflow-y-auto">
+            <span class="text-sm text-gray-400">Loading…</span>
+          </div>
+        </div>
+        <!-- Date range -->
+        <div>
+          <div class="text-sm font-medium text-gray-700 mb-2">Search period</div>
+          <div class="flex gap-2 mb-2">
+            <button type="button" id="run-dr-24h" onclick="setRunDateRange('24h')"
+                    class="run-dr-btn flex-1 py-1.5 px-2 rounded-lg border text-sm font-medium transition-colors">
+              Last 24h
+            </button>
+            <button type="button" id="run-dr-7d" onclick="setRunDateRange('7d')"
+                    class="run-dr-btn flex-1 py-1.5 px-2 rounded-lg border text-sm font-medium transition-colors">
+              Last 7 days
+            </button>
+            <button type="button" id="run-dr-custom" onclick="setRunDateRange('custom')"
+                    class="run-dr-btn flex-1 py-1.5 px-2 rounded-lg border text-sm font-medium transition-colors">
+              Custom
+            </button>
+          </div>
+          <div id="run-dr-custom-inputs" class="hidden flex gap-3">
+            <div class="flex-1">
+              <label class="block text-xs text-gray-500 mb-0.5">From</label>
+              <input type="date" id="run-dr-from"
+                     class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div class="flex-1">
+              <label class="block text-xs text-gray-500 mb-0.5">To</label>
+              <input type="date" id="run-dr-to"
+                     class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-500">
+            </div>
+          </div>
+        </div>
+        <p id="run-modal-msg" class="hidden text-xs text-red-600"></p>
+      </div>
+      <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
+        <button type="button" onclick="closeRunModal()"
+                class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors">
+          Cancel
+        </button>
+        <button id="run-modal-submit" onclick="submitRun()"
+                class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-5 py-2 rounded-xl text-sm transition-colors shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          Run
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script>
+    // ---- Global state ----
+    let _scheduleActive = false;
+    let _scheduleData = null;   // latest data from /api/schedule/status
+    let _schedDateRange = '24h';
+    let _schedFrequency = 'daily';  // 'daily' | 'custom'
+    let _runDateRange = '24h';
+    let _runCallback = null;    // set by home.ejs to handle progress display
+
+    const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+    function escHtml(str) {
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ---- Schedule helpers ----
+
     function cronToLabel(expression, timezone) {
       if (!expression) return '';
       const parts = expression.split(' ');
-      if (parts.length < 2) return expression;
+      if (parts.length < 5) return expression;
       const h = String(parts[1]).padStart(2, '0');
       const m = String(parts[0]).padStart(2, '0');
       const tz = (timezone || 'UTC').split('/').pop().replace(/_/g, ' ');
-      return h + ':' + m + ' ' + tz;
+      const dayPart = parts[4];
+      const dayLabel = (!dayPart || dayPart === '*') ? '' : ' · ' + dayPart.split(',').map(d => DAY_NAMES[parseInt(d,10)] || d).join(', ');
+      return h + ':' + m + ' ' + tz + dayLabel;
+    }
+
+    function getFrequencyLabel(expression) {
+      if (!expression) return 'Daily';
+      const parts = expression.split(' ');
+      const dayPart = parts[4] || '*';
+      if (dayPart === '*') return 'Daily';
+      return dayPart.split(',').map(d => DAY_NAMES[parseInt(d,10)] || d).join(', ');
     }
 
     function setScheduleUI(active, expression, timezone) {
+      _scheduleActive = active;
       document.getElementById('schedule-inactive').classList.toggle('hidden', active);
       document.getElementById('schedule-active').classList.toggle('hidden', !active);
       if (expression) document.getElementById('schedule-expr').textContent = cronToLabel(expression, timezone);
+
+      // Sync home-page Schedule button if present
+      const homeBtn = document.getElementById('home-schedule-btn');
+      if (homeBtn) {
+        const lbl = homeBtn.querySelector('[data-schedule-label]');
+        if (active) {
+          homeBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+          homeBtn.classList.add('bg-emerald-600', 'hover:bg-emerald-700');
+          if (lbl) lbl.textContent = 'Schedule ✓';
+        } else {
+          homeBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700');
+          homeBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+          if (lbl) lbl.textContent = 'Schedule';
+        }
+      }
+    }
+
+    function handleScheduleClick() {
+      if (_scheduleActive) {
+        openScheduleStatusModal();
+      } else {
+        openScheduleModal();
+      }
     }
 
     function showScheduleMsg(text, isError) {
@@ -266,20 +514,86 @@
       setTimeout(() => el.classList.add('hidden'), 4000);
     }
 
+    // ---- Schedule Setup Modal ----
+
+    function setSchedDateRange(range) {
+      _schedDateRange = range;
+      document.querySelectorAll('.sched-dr-btn').forEach(btn => {
+        const isActive = btn.id === 'sched-dr-' + range;
+        btn.classList.toggle('bg-blue-600', isActive);
+        btn.classList.toggle('text-white', isActive);
+        btn.classList.toggle('border-blue-600', isActive);
+        btn.classList.toggle('text-gray-600', !isActive);
+        btn.classList.toggle('border-gray-300', !isActive);
+        btn.classList.toggle('hover:bg-gray-50', !isActive);
+      });
+    }
+
+    function setSchedFrequency(freq) {
+      _schedFrequency = freq;
+      document.querySelectorAll('.freq-btn').forEach(btn => {
+        const isActive = btn.id === 'freq-' + freq;
+        btn.classList.toggle('bg-blue-600', isActive);
+        btn.classList.toggle('text-white', isActive);
+        btn.classList.toggle('border-blue-600', isActive);
+        btn.classList.toggle('text-gray-600', !isActive);
+        btn.classList.toggle('border-gray-300', !isActive);
+        btn.classList.toggle('hover:bg-gray-50', !isActive);
+      });
+      document.getElementById('sched-freq-days')?.classList.toggle('hidden', freq !== 'custom');
+    }
+
+    function renderSchedGroups(groups, savedGroupIds) {
+      const container = document.getElementById('sched-modal-groups');
+      if (!groups || groups.length === 0) {
+        container.innerHTML = '<span class="text-sm text-gray-400">No roles configured.</span>';
+        return;
+      }
+      const isAll = !savedGroupIds || savedGroupIds.length === 0;
+      container.innerHTML = groups.map(g => `
+        <label class="flex items-center gap-3 cursor-pointer py-1.5 hover:bg-gray-50 rounded-lg px-1">
+          <input type="checkbox" class="sched-group-check w-4 h-4 rounded accent-blue-600"
+                 value="${g.id}" ${isAll || savedGroupIds.includes(g.id) ? 'checked' : ''}>
+          <span class="text-sm text-gray-800 flex-1">${escHtml(g.group_name || 'Role #' + g.id)}</span>
+          ${!g.is_active ? '<span class="text-xs text-gray-400 italic">inactive</span>' : ''}
+        </label>
+      `).join('');
+    }
+
     function openScheduleModal() {
-      // Pre-fill with current settings from API
-      fetch('/api/schedule/status').then(r => r.json()).then(data => {
-        if (data.email_send_time) {
-          document.getElementById('sched-time-input').value = data.email_send_time;
-        }
-        if (data.timezone) {
-          document.getElementById('sched-tz-select').value = data.timezone;
-        }
-      }).catch(() => {});
+      document.getElementById('sched-modal-groups').innerHTML = '<span class="text-sm text-gray-400">Loading…</span>';
       document.getElementById('sched-modal-msg').classList.add('hidden');
       document.getElementById('sched-start-btn').disabled = false;
-      document.getElementById('sched-start-btn').textContent = 'Start Schedule';
+      document.getElementById('sched-start-btn').innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Start Schedule';
       document.getElementById('schedule-modal').classList.remove('hidden');
+
+      fetch('/api/schedule/status').then(r => r.json()).then(data => {
+        _scheduleData = data;
+        if (data.email_send_time) document.getElementById('sched-time-input').value = data.email_send_time;
+        if (data.timezone) document.getElementById('sched-tz-select').value = data.timezone;
+        setSchedDateRange(data.schedule_date_range || '24h');
+
+        // Pre-fill frequency + days from saved cron expression
+        const expr = data.expression || '';
+        const parts = expr.split(' ');
+        const dayPart = parts[4] || '*';
+        if (!dayPart || dayPart === '*') {
+          setSchedFrequency('daily');
+        } else {
+          setSchedFrequency('custom');
+          const selectedDays = dayPart.split(',').map(d => parseInt(d, 10));
+          document.querySelectorAll('.sched-day-check').forEach(cb => {
+            cb.checked = selectedDays.includes(parseInt(cb.value, 10));
+          });
+        }
+
+        // Render groups with saved selections
+        renderSchedGroups(data.groups || [], data.schedule_group_ids || []);
+      }).catch(() => {
+        setSchedDateRange('24h');
+        setSchedFrequency('daily');
+        document.getElementById('sched-modal-groups').innerHTML = '<span class="text-sm text-red-500">Failed to load roles.</span>';
+      });
     }
 
     function closeScheduleModal() {
@@ -292,6 +606,23 @@
       const btn = document.getElementById('sched-start-btn');
       const msgEl = document.getElementById('sched-modal-msg');
 
+      // Validate days selection
+      let scheduleDays = '*';
+      if (_schedFrequency === 'custom') {
+        const checked = Array.from(document.querySelectorAll('.sched-day-check:checked')).map(c => c.value);
+        if (checked.length === 0) {
+          msgEl.textContent = 'Select at least one day.';
+          msgEl.className = 'text-xs text-red-600';
+          msgEl.classList.remove('hidden');
+          return;
+        }
+        scheduleDays = checked.sort((a, b) => parseInt(a) - parseInt(b)).join(',');
+      }
+
+      // Collect selected group IDs
+      const groupChecks = document.querySelectorAll('.sched-group-check:checked');
+      const groupIds = Array.from(groupChecks).map(c => parseInt(c.value, 10));
+
       btn.disabled = true;
       btn.textContent = 'Starting…';
       msgEl.classList.add('hidden');
@@ -300,10 +631,17 @@
         const res = await fetch('/api/schedule/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email_send_time: time, timezone }),
+          body: JSON.stringify({
+            email_send_time: time,
+            timezone,
+            schedule_date_range: _schedDateRange,
+            schedule_days: scheduleDays,
+            group_ids: groupIds,
+          }),
         });
         const data = await res.json();
         if (data.success) {
+          _scheduleData = data;
           setScheduleUI(true, data.expression, data.timezone);
           showScheduleMsg('Schedule started', false);
           closeScheduleModal();
@@ -328,7 +666,7 @@
         const res = await fetch('/api/schedule/stop', { method: 'POST' });
         const data = await res.json();
         if (data.success) {
-          setScheduleUI(false, null);
+          setScheduleUI(false, null, null);
           showScheduleMsg('Schedule stopped', false);
         }
       } catch (e) {
@@ -336,30 +674,173 @@
       }
     }
 
-    async function sidebarRunOnce(btn) {
-      const label = document.getElementById('sidebar-run-label');
-      btn.disabled = true;
-      label.textContent = 'Running…';
+    // ---- Schedule Status Modal ----
+
+    function openScheduleStatusModal() {
+      if (_scheduleData) {
+        const tz = _scheduleData.timezone || '';
+        const expr = _scheduleData.expression || '';
+        const dr = _scheduleData.schedule_date_range || '24h';
+        const groups = _scheduleData.groups || [];
+        const groupIds = _scheduleData.schedule_group_ids || [];
+
+        // Time from cron expression
+        const parts = expr.split(' ');
+        const h = String(parts[1] || '7').padStart(2, '0');
+        const m = String(parts[0] || '0').padStart(2, '0');
+        document.getElementById('sched-status-time').textContent = h + ':' + m;
+        document.getElementById('sched-status-tz').textContent = tz.split('/').pop()?.replace(/_/g, ' ') || tz;
+        document.getElementById('sched-status-dr').textContent = dr === '7d' ? 'Last 7 days' : 'Last 24h';
+        document.getElementById('sched-status-freq').textContent = getFrequencyLabel(expr);
+
+        // Roles display
+        if (groupIds.length === 0) {
+          document.getElementById('sched-status-roles').textContent = 'All active';
+        } else {
+          const selectedNames = groups.filter(g => groupIds.includes(g.id)).map(g => g.group_name || 'Role #' + g.id);
+          const activeCount = groups.filter(g => g.is_active).length;
+          if (selectedNames.length === activeCount && activeCount > 0) {
+            document.getElementById('sched-status-roles').textContent = 'All active';
+          } else {
+            document.getElementById('sched-status-roles').textContent = groupIds.length + ' of ' + groups.length + ' roles';
+          }
+        }
+      }
+      document.getElementById('schedule-status-modal').classList.remove('hidden');
+    }
+
+    function closeScheduleStatusModal() {
+      document.getElementById('schedule-status-modal').classList.add('hidden');
+    }
+
+    // ---- Run Once Modal ----
+
+    function setRunDateRange(range) {
+      _runDateRange = range;
+      document.querySelectorAll('.run-dr-btn').forEach(btn => {
+        const isActive = btn.id === 'run-dr-' + range;
+        btn.classList.toggle('bg-blue-600', isActive);
+        btn.classList.toggle('text-white', isActive);
+        btn.classList.toggle('border-blue-600', isActive);
+        btn.classList.toggle('text-gray-600', !isActive);
+        btn.classList.toggle('border-gray-300', !isActive);
+        btn.classList.toggle('hover:bg-gray-50', !isActive);
+      });
+      document.getElementById('run-dr-custom-inputs')?.classList.toggle('hidden', range !== 'custom');
+    }
+
+    function renderRunGroups(groups) {
+      const container = document.getElementById('run-modal-groups');
+      if (!groups || groups.length === 0) {
+        container.innerHTML = '<span class="text-sm text-gray-400">No roles configured.</span>';
+        return;
+      }
+      container.innerHTML = groups.map(g => `
+        <label class="flex items-center gap-3 cursor-pointer py-1.5 hover:bg-gray-50 rounded-lg px-1">
+          <input type="checkbox" class="run-group-check w-4 h-4 rounded accent-blue-600"
+                 value="${g.id}" ${g.is_active ? 'checked' : ''}>
+          <span class="text-sm text-gray-800 flex-1">${escHtml(g.group_name || 'Role #' + g.id)}</span>
+          ${!g.is_active ? '<span class="text-xs text-gray-400 italic">inactive</span>' : ''}
+        </label>
+      `).join('');
+    }
+
+    async function openRunModal() {
+      document.getElementById('run-modal').classList.remove('hidden');
+      document.getElementById('run-modal-msg').classList.add('hidden');
+      document.getElementById('run-modal-submit').disabled = false;
+      document.getElementById('run-modal-groups').innerHTML = '<span class="text-sm text-gray-400">Loading…</span>';
+      setRunDateRange('24h');
+
       try {
-        const res = await fetch('/api/run', { method: 'POST' });
+        const res = await fetch('/api/groups');
         const data = await res.json();
-        label.textContent = data.success ? 'Started!' : (data.error || 'Error');
-      } catch(e) {
-        label.textContent = 'Error';
-      } finally {
-        setTimeout(() => { btn.disabled = false; label.textContent = 'Run Once'; }, 4000);
+        renderRunGroups(data.groups || []);
+      } catch (e) {
+        document.getElementById('run-modal-groups').innerHTML = '<span class="text-sm text-red-500">Failed to load roles.</span>';
       }
     }
 
-    // Restore schedule state on every page load
+    function closeRunModal() {
+      document.getElementById('run-modal').classList.add('hidden');
+    }
+
+    async function submitRun() {
+      const checks = document.querySelectorAll('.run-group-check:checked');
+      const groupIds = Array.from(checks).map(c => parseInt(c.value, 10));
+
+      let dateRange;
+      if (_runDateRange === 'custom') {
+        const from = document.getElementById('run-dr-from').value;
+        const to = document.getElementById('run-dr-to').value;
+        if (!from || !to) {
+          const msgEl = document.getElementById('run-modal-msg');
+          msgEl.textContent = 'Select both from and to dates.';
+          msgEl.classList.remove('hidden');
+          return;
+        }
+        if (from > to) {
+          const msgEl = document.getElementById('run-modal-msg');
+          msgEl.textContent = '"From" date must be before "To" date.';
+          msgEl.classList.remove('hidden');
+          return;
+        }
+        dateRange = { from, to };
+      } else {
+        dateRange = _runDateRange;
+      }
+
+      const submitBtn = document.getElementById('run-modal-submit');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Starting…';
+
+      try {
+        const res = await fetch('/api/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ groupIds, dateRange }),
+        });
+        const data = await res.json();
+
+        closeRunModal();
+
+        if (data.success) {
+          if (typeof _runCallback === 'function') {
+            _runCallback();
+            _runCallback = null;
+          } else {
+            // Sidebar feedback
+            const label = document.getElementById('sidebar-run-label');
+            const sidebarBtn = document.getElementById('sidebar-run-btn');
+            if (label) label.textContent = 'Running…';
+            if (sidebarBtn) sidebarBtn.disabled = true;
+            setTimeout(() => {
+              if (label) label.textContent = 'Run Once';
+              if (sidebarBtn) sidebarBtn.disabled = false;
+            }, 5000);
+          }
+        } else {
+          await showAlert(data.error || 'Failed to start pipeline.');
+        }
+      } catch (e) {
+        closeRunModal();
+        await showAlert('Network error. Could not reach the server.');
+      }
+    }
+
+    // Restore schedule state on every page load (also populates _scheduleData for status modal)
     fetch('/api/schedule/status').then(r => r.json()).then(data => {
+      _scheduleData = data;
       setScheduleUI(data.active, data.expression, data.timezone);
     }).catch(() => {});
 
-    // Close schedule modal on Escape
+
+    // Close modals on Escape
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
         closeScheduleModal();
+        closeScheduleStatusModal();
+        closeRunModal();
         closeVerdictDropdown();
         if (_jhConfirmResolve) _jhConfirmResolve(false);
         if (_jhAlertResolve) _jhAlertResolve();
@@ -417,7 +898,6 @@
       _verdictBtn = null;
     }
 
-    // Close on outside click
     document.addEventListener('click', e => {
       const dd = document.getElementById('verdict-dropdown');
       if (!dd.classList.contains('hidden') && !dd.contains(e.target) && !e.target.closest('.verdict-btn')) {
@@ -425,7 +905,6 @@
       }
     });
 
-    // Open on verdict-btn click (event delegation)
     document.addEventListener('click', e => {
       const btn = e.target.closest('.verdict-btn');
       if (btn) { e.stopPropagation(); openVerdictDropdown(btn); }

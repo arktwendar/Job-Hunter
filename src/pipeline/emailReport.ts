@@ -206,6 +206,7 @@ export async function sendTestEmail(recipientEmail: string, resendApiKey: string
   const mockJobs: JobRow[] = [
     {
       id: 1,
+      profile_id: 1,
       linkedin_job_id: 'test-001',
       title: 'Senior Product Manager — Platform',
       company: 'Acme Corp',

@@ -75,6 +75,7 @@ interface DateGroup {
 
 router.get('/', (req: Request, res: Response) => {
   const db = getDb();
+  const profileId = req.profile.id;
 
   // Active tab from ?group=<id|'others'>
   const groupParam = String(req.query.group || 'all');
@@ -82,40 +83,40 @@ router.get('/', (req: Request, res: Response) => {
   const activeGroupId = !activeOthers && groupParam !== 'all'
     ? parseInt(groupParam, 10) : null;
 
-  // Tabs: groups that have at least one STRONG_MATCH job
+  // Tabs: groups (for this profile) that have at least one STRONG_MATCH job
   const tabGroups = db.prepare(`
     SELECT sg.id, sg.group_name, COUNT(j.id) as job_count
     FROM search_groups sg
     INNER JOIN jobs j ON j.group_id = sg.id
-    WHERE j.ai_verdict = 'STRONG_MATCH' AND j.is_duplicate = 0
+    WHERE sg.profile_id = ? AND j.ai_verdict = 'STRONG_MATCH' AND j.is_duplicate = 0
     GROUP BY sg.id ORDER BY sg.id ASC
-  `).all() as Array<{ id: number; group_name: string; job_count: number }>;
+  `).all(profileId) as Array<{ id: number; group_name: string; job_count: number }>;
 
-  // "Others" tab: orphaned jobs whose group has been deleted
+  // "Others" tab: jobs for this profile whose group was deleted
   const orphanCount = (db.prepare(`
     SELECT COUNT(*) as c FROM jobs
-    WHERE ai_verdict = 'STRONG_MATCH' AND is_duplicate = 0
-    AND (group_id IS NULL OR group_id NOT IN (SELECT id FROM search_groups))
-  `).get() as { c: number }).c;
+    WHERE profile_id = ? AND ai_verdict = 'STRONG_MATCH' AND is_duplicate = 0
+    AND (group_id IS NULL OR group_id NOT IN (SELECT id FROM search_groups WHERE profile_id = ?))
+  `).get(profileId, profileId) as { c: number }).c;
 
   const jobs = (activeGroupId
     ? db.prepare(
         `SELECT * FROM jobs
-         WHERE ai_verdict = 'STRONG_MATCH' AND is_duplicate = 0 AND group_id = ?
+         WHERE profile_id = ? AND ai_verdict = 'STRONG_MATCH' AND is_duplicate = 0 AND group_id = ?
          ORDER BY DATE(fetched_at) DESC, ai_score DESC`,
-      ).all(activeGroupId)
+      ).all(profileId, activeGroupId)
     : activeOthers
     ? db.prepare(
         `SELECT * FROM jobs
-         WHERE ai_verdict = 'STRONG_MATCH' AND is_duplicate = 0
-         AND (group_id IS NULL OR group_id NOT IN (SELECT id FROM search_groups))
+         WHERE profile_id = ? AND ai_verdict = 'STRONG_MATCH' AND is_duplicate = 0
+         AND (group_id IS NULL OR group_id NOT IN (SELECT id FROM search_groups WHERE profile_id = ?))
          ORDER BY DATE(fetched_at) DESC, ai_score DESC`,
-      ).all()
+      ).all(profileId, profileId)
     : db.prepare(
         `SELECT * FROM jobs
-         WHERE ai_verdict = 'STRONG_MATCH' AND is_duplicate = 0
+         WHERE profile_id = ? AND ai_verdict = 'STRONG_MATCH' AND is_duplicate = 0
          ORDER BY DATE(fetched_at) DESC, ai_score DESC`,
-      ).all()
+      ).all(profileId)
   ) as JobRow[];
 
   // Location grouping
@@ -150,8 +151,8 @@ router.get('/', (req: Request, res: Response) => {
     }));
 
   const totalAll = (db.prepare(
-    `SELECT COUNT(*) as c FROM jobs WHERE ai_verdict = 'STRONG_MATCH' AND is_duplicate = 0`,
-  ).get() as { c: number }).c;
+    `SELECT COUNT(*) as c FROM jobs WHERE profile_id = ? AND ai_verdict = 'STRONG_MATCH' AND is_duplicate = 0`,
+  ).get(profileId) as { c: number }).c;
 
   res.render('jobs', { locationGroups, dateGroups, tabGroups, activeGroupId, activeOthers, orphanCount, total: totalAll, title: 'Jobs Match' });
 });

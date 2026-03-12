@@ -27,6 +27,8 @@ export interface SearchFilters {
   jobType: string;
 }
 
+export type DateRange = '24h' | '7d' | { from: string; to: string };
+
 // --- Work mode & job type mappings ---
 
 const WORK_MODE_MAP: Record<string, string> = {
@@ -128,34 +130,48 @@ function mapToJobPosting(item: HarvestJob): JobPosting {
   };
 }
 
-function filterByTimeWindow(job: JobPosting): boolean {
+function getPostedLimit(dateRange: DateRange): string {
+  if (dateRange === '24h') return '24h';
+  if (dateRange === '7d') return '1 week';
+  return '1 month'; // custom range — filter client-side
+}
+
+function filterByTimeWindow(job: JobPosting, dateRange: DateRange = '24h'): boolean {
   if (!job.postedDate) {
     console.warn(`[fetcher] Job ${job.jobId}: missing postedDate, accepting with LOW confidence`);
     return true;
   }
-  // Accept jobs posted within the last 48h to avoid edge cases with timezone/time-of-day
-  const cutoff = new Date();
-  cutoff.setUTCHours(cutoff.getUTCHours() - 48);
   const posted = new Date(job.postedDate);
+  if (typeof dateRange === 'object') {
+    // Custom range: from..to inclusive (full to-day)
+    const from = new Date(dateRange.from);
+    const to = new Date(dateRange.to);
+    to.setUTCHours(23, 59, 59, 999);
+    return posted >= from && posted <= to;
+  }
+  // Rolling window with extra buffer day to handle timezone/posting-time edge cases
+  const bufferHours = dateRange === '7d' ? 8 * 24 : 48;
+  const cutoff = new Date();
+  cutoff.setUTCHours(cutoff.getUTCHours() - bufferHours);
   return posted >= cutoff;
 }
 
 // --- Main export ---
 
-export async function fetchJobs(filters: SearchFilters, apifyToken: string): Promise<JobPosting[]> {
-  const client = new ApifyClient({ token: apifyToken });
-  const workplaceTypes = filters.workModes
-    .map((m) => WORK_MODE_MAP[m])
-    .filter(Boolean);
+const FETCH_MAX_ATTEMPTS = 3;
+const FETCH_RETRY_DELAY_MS = 5_000;
 
-  const employmentType = filters.jobType
-    ? [JOB_TYPE_MAP[filters.jobType] || filters.jobType]
-    : [];
+async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function fetchJobs(filters: SearchFilters, apifyToken: string, dateRange: DateRange = '24h'): Promise<JobPosting[]> {
+  const client = new ApifyClient({ token: apifyToken });
 
   const actorInput: Record<string, unknown> = {
     jobTitles: filters.keywords,
     locations: filters.locations,
-    postedLimit: '24h',
+    postedLimit: getPostedLimit(dateRange),
     sortBy: 'date',
     maxItems: 100,
   };
@@ -165,20 +181,37 @@ export async function fetchJobs(filters: SearchFilters, apifyToken: string): Pro
 
   console.log(`[fetcher] Starting Apify actor run — ${filters.keywords.length} keywords × ${filters.locations.length} locations`);
 
-  const run = await client.actor('harvestapi/linkedin-job-search').call(actorInput, { waitSecs: 900 });
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= FETCH_MAX_ATTEMPTS; attempt++) {
+    try {
+      const run = await client.actor('harvestapi/linkedin-job-search').call(actorInput, { waitSecs: 900 });
 
-  console.log(`[fetcher] Actor run complete (${run.id}), fetching dataset items…`);
+      console.log(`[fetcher] Actor run complete (${run.id}), fetching dataset items…`);
 
-  const { items } = await client.dataset(run.defaultDatasetId).listItems();
+      const { items } = await client.dataset(run.defaultDatasetId).listItems();
 
-  console.log(`[fetcher] Raw items from actor: ${items.length}`);
+      console.log(`[fetcher] Raw items from actor: ${items.length}`);
 
-  const jobs = (items as HarvestJob[])
-    .map(mapToJobPosting)
-    .filter((j) => j.jobId)          // must have a job ID
-    .filter(filterByTimeWindow);      // posted within last 48h
+      const jobs = (items as HarvestJob[])
+        .map(mapToJobPosting)
+        .filter((j) => j.jobId)                          // must have a job ID
+        .filter((j) => filterByTimeWindow(j, dateRange)); // within requested time window
 
-  console.log(`[fetcher] Jobs after time-window filter: ${jobs.length}`);
+      console.log(`[fetcher] Jobs after time-window filter: ${jobs.length}`);
 
-  return jobs;
+      return jobs;
+    } catch (err) {
+      lastErr = err;
+      const code = (err as NodeJS.ErrnoException).code;
+      const isTransient = code === 'ECONNRESET' || code === 'ETIMEDOUT' || code === 'ECONNABORTED';
+      if (isTransient && attempt < FETCH_MAX_ATTEMPTS) {
+        console.warn(`[fetcher] Attempt ${attempt} failed (${code}), retrying in ${FETCH_RETRY_DELAY_MS / 1000}s…`);
+        await sleep(FETCH_RETRY_DELAY_MS);
+      } else {
+        break;
+      }
+    }
+  }
+
+  throw lastErr;
 }

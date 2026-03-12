@@ -8,12 +8,13 @@ import { getDb, type JobRow, type SearchRunRow, type SearchGroupRow, type Settin
 const router = Router();
 
 // Home — today's curated jobs, last run stats, "Run Now" button
-router.get('/', (_req: Request, res: Response) => {
+router.get('/', (req: Request, res: Response) => {
   const db = getDb();
+  const profileId = req.profile.id;
 
   const lastRun = db
-    .prepare(`SELECT * FROM search_runs ORDER BY ran_at DESC LIMIT 1`)
-    .get() as SearchRunRow | undefined;
+    .prepare(`SELECT * FROM search_runs WHERE profile_id = ? ORDER BY ran_at DESC LIMIT 1`)
+    .get(profileId) as SearchRunRow | undefined;
 
   // Jobs from the last pipeline run
   const lastRunAt = lastRun?.ran_at ?? null;
@@ -24,29 +25,28 @@ router.get('/', (_req: Request, res: Response) => {
         SELECT
           SUM(CASE WHEN ai_verdict = 'STRONG_MATCH' AND is_duplicate = 0 THEN 1 ELSE 0 END) as strong,
           SUM(CASE WHEN is_duplicate = 1 THEN 1 ELSE 0 END) as duplicate
-        FROM jobs WHERE fetched_at >= ?
-      `).get(lastRunAt) as { strong: number; duplicate: number } | undefined)
+        FROM jobs WHERE profile_id = ? AND fetched_at >= ?
+      `).get(profileId, lastRunAt) as { strong: number; duplicate: number } | undefined)
     : undefined;
 
   const lastRunJobs = lastRunAt
     ? (db
         .prepare(
           `SELECT * FROM jobs
-           WHERE fetched_at >= ? AND is_duplicate = 0 AND ai_verdict = 'STRONG_MATCH'
+           WHERE profile_id = ? AND fetched_at >= ? AND is_duplicate = 0 AND ai_verdict = 'STRONG_MATCH'
            ORDER BY ai_score DESC`,
         )
-        .all(lastRunAt) as JobRow[])
+        .all(profileId, lastRunAt) as JobRow[])
     : [];
 
   const newCount = db
-    .prepare(`SELECT COUNT(*) as c FROM jobs WHERE seen = 0 AND is_duplicate = 0 AND ai_verdict = 'STRONG_MATCH'`)
-    .get() as { c: number };
+    .prepare(`SELECT COUNT(*) as c FROM jobs WHERE profile_id = ? AND seen = 0 AND is_duplicate = 0 AND ai_verdict = 'STRONG_MATCH'`)
+    .get(profileId) as { c: number };
 
   const seenCount = db
-    .prepare(`SELECT COUNT(*) as c FROM jobs WHERE seen = 1 AND is_duplicate = 0 AND ai_verdict = 'STRONG_MATCH'`)
-    .get() as { c: number };
+    .prepare(`SELECT COUNT(*) as c FROM jobs WHERE profile_id = ? AND seen = 1 AND is_duplicate = 0 AND ai_verdict = 'STRONG_MATCH'`)
+    .get(profileId) as { c: number };
 
-  // Location breakdown (last run)
   const allTimeStats = db.prepare(`
     SELECT
       COALESCE(SUM(jobs_fetched), 0)      as total_fetched,
@@ -55,8 +55,8 @@ router.get('/', (_req: Request, res: Response) => {
       COALESCE(SUM(jobs_weak_match), 0)   as total_weak,
       COALESCE(SUM(jobs_no_match), 0)     as total_no_match,
       COALESCE(SUM(jobs_duplicate), 0)    as total_duplicate
-    FROM search_runs WHERE status != 'running'
-  `).get() as {
+    FROM search_runs WHERE profile_id = ? AND status != 'running'
+  `).get(profileId) as {
     total_fetched: number; total_scored: number; total_strong: number;
     total_weak: number; total_no_match: number; total_duplicate: number;
   };
@@ -65,15 +65,15 @@ router.get('/', (_req: Request, res: Response) => {
     ? (db
         .prepare(
           `SELECT location, COUNT(*) as count FROM jobs
-           WHERE fetched_at >= ? AND is_duplicate = 0 AND ai_verdict = 'STRONG_MATCH' AND location IS NOT NULL
+           WHERE profile_id = ? AND fetched_at >= ? AND is_duplicate = 0 AND ai_verdict = 'STRONG_MATCH' AND location IS NOT NULL
            GROUP BY location ORDER BY count DESC LIMIT 10`,
         )
-        .all(lastRunAt) as Array<{ location: string; count: number }>)
+        .all(profileId, lastRunAt) as Array<{ location: string; count: number }>)
     : [];
 
-  const settings = db.prepare('SELECT * FROM settings WHERE id = 1').get() as SettingsRow | undefined;
-  const groupCount = (db.prepare('SELECT COUNT(*) as c FROM search_groups').get() as { c: number }).c;
-  const appliedCount = (db.prepare(`SELECT COUNT(*) as c FROM jobs WHERE applied = 1 AND is_duplicate = 0 AND ai_verdict = 'STRONG_MATCH'`).get() as { c: number }).c;
+  const settings = db.prepare('SELECT * FROM settings WHERE profile_id = ?').get(profileId) as SettingsRow | undefined;
+  const groupCount = (db.prepare('SELECT COUNT(*) as c FROM search_groups WHERE profile_id = ?').get(profileId) as { c: number }).c;
+  const appliedCount = (db.prepare(`SELECT COUNT(*) as c FROM jobs WHERE profile_id = ? AND applied = 1 AND is_duplicate = 0 AND ai_verdict = 'STRONG_MATCH'`).get(profileId) as { c: number }).c;
 
   // Onboarding checklist steps
   const checklist = {
@@ -103,6 +103,7 @@ router.get('/', (_req: Request, res: Response) => {
 // Job History — paginated, filterable — queries jobs table (one row per unique linkedin_job_id)
 router.get('/history', (req: Request, res: Response) => {
   const db = getDb();
+  const profileId = req.profile.id;
   const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
   const limit = 25;
   const offset = (page - 1) * limit;
@@ -125,8 +126,8 @@ router.get('/history', (req: Request, res: Response) => {
         ? null
         : parseInt(String(groupParam), 10);
 
-  const conditions: string[] = [];
-  const params: (string | number)[] = [];
+  const conditions: string[] = ['j.profile_id = ?'];
+  const params: (string | number)[] = [profileId];
 
   // DUPLICATE filter maps to is_duplicate=1; other verdicts filter by ai_verdict
   if (verdict === 'DUPLICATE') {
@@ -150,7 +151,7 @@ router.get('/history', (req: Request, res: Response) => {
     params.push(groupId);
   }
 
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const where = `WHERE ${conditions.join(' AND ')}`;
 
   const total = (
     db.prepare(`SELECT COUNT(*) as c FROM jobs j ${where}`).get(...params) as { c: number }
@@ -166,7 +167,7 @@ router.get('/history', (req: Request, res: Response) => {
     .all(...params, limit, offset) as JobRow[];
 
   const totalPages = Math.ceil(total / limit);
-  const groups = db.prepare('SELECT id, group_name FROM search_groups ORDER BY id ASC').all() as Pick<SearchGroupRow, 'id' | 'group_name'>[];
+  const groups = db.prepare('SELECT id, group_name FROM search_groups WHERE profile_id = ? ORDER BY id ASC').all(profileId) as Pick<SearchGroupRow, 'id' | 'group_name'>[];
 
   res.render('history', {
     jobs,
@@ -206,29 +207,28 @@ router.get('/job/:id', (req: Request, res: Response) => {
   const backUrl   = from === 'jobs' ? '/jobs' : from === 'home' ? '/' : '/history';
   const backLabel = 'Back';
 
-  // Prev/Next navigation — order matches the source page
+  // Prev/Next navigation — scoped to same profile, order matches the source page
+  const profileId = req.profile.id;
   let prevId: number | null = null;
   let nextId: number | null = null;
   if (from === 'jobs') {
-    // Jobs Match sorts: fetched_at DESC, ai_score DESC (all strong matches, all time)
     const allIds = db.prepare(`
       SELECT id FROM jobs
-      WHERE ai_verdict = 'STRONG_MATCH' AND is_duplicate = 0
+      WHERE profile_id = ? AND ai_verdict = 'STRONG_MATCH' AND is_duplicate = 0
       ORDER BY DATE(fetched_at) DESC, ai_score DESC
-    `).all() as Array<{ id: number }>;
+    `).all(profileId) as Array<{ id: number }>;
     const idx = allIds.findIndex((r) => r.id === id);
     if (idx > 0) prevId = allIds[idx - 1].id;
     if (idx >= 0 && idx < allIds.length - 1) nextId = allIds[idx + 1].id;
   } else if (from === 'home') {
-    // Home sorts: ai_score DESC within the last run (same day)
     const day = job.fetched_at ? String(job.fetched_at).slice(0, 10) : null;
     if (day) {
       const sameDayIds = db.prepare(`
         SELECT id FROM jobs
-        WHERE ai_verdict = 'STRONG_MATCH' AND is_duplicate = 0
+        WHERE profile_id = ? AND ai_verdict = 'STRONG_MATCH' AND is_duplicate = 0
           AND strftime('%Y-%m-%d', fetched_at) = ?
         ORDER BY ai_score DESC
-      `).all(day) as Array<{ id: number }>;
+      `).all(profileId, day) as Array<{ id: number }>;
       const idx = sameDayIds.findIndex((r) => r.id === id);
       if (idx > 0) prevId = sameDayIds[idx - 1].id;
       if (idx >= 0 && idx < sameDayIds.length - 1) nextId = sameDayIds[idx + 1].id;

@@ -1,5 +1,5 @@
 import * as path from 'path';
-import express from 'express';
+import express, { type Request, type Response, type NextFunction } from 'express';
 import { config } from './config';
 import { getDb } from './db';
 import { dashboardRouter } from './routes/dashboard';
@@ -19,6 +19,35 @@ const app = express();
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
+// Body parsing (before middleware that reads req.body)
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+
+// Profile middleware — reads active_profile_id cookie, attaches req.profile + res.locals.activeProfile
+const PROFILES: Record<number, string> = { 1: 'Mikhail', 2: 'Arina' };
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const cookieHeader = req.headers.cookie || '';
+  const match = cookieHeader.match(/(?:^|;\s*)active_profile_id=(\d+)/);
+  const rawId = match ? parseInt(match[1], 10) : 1;
+  const profileId = (rawId === 1 || rawId === 2) ? rawId : 1;
+  req.profile = { id: profileId, name: PROFILES[profileId] };
+  res.locals.activeProfile = req.profile;
+  next();
+});
+
+// Profile switch endpoint (must be before routers)
+app.post('/api/profile/switch', (req: Request, res: Response) => {
+  const rawId = parseInt(String((req.body as Record<string, unknown>).profile_id || '1'), 10);
+  const profileId = (rawId === 1 || rawId === 2) ? rawId : 1;
+  const redirectTo = req.headers.referer || '/';
+  res.setHeader(
+    'Set-Cookie',
+    `active_profile_id=${profileId}; Path=/; HttpOnly; SameSite=Lax`,
+  );
+  res.redirect(redirectTo);
+});
+
 // EJS layout helper — wraps views in layout.ejs
 app.use((req, res, next) => {
   const originalRender = res.render.bind(res);
@@ -33,10 +62,6 @@ app.use((req, res, next) => {
   };
   next();
 });
-
-// Body parsing
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
 
 // Routes
 app.use('/', dashboardRouter);
@@ -60,7 +85,15 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   });
 });
 
-// --- Cron Scheduler (delegated to scheduler.ts) ---
+// --- Process-level error guards ---
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[process] Unhandled rejection (server kept alive):', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[process] Uncaught exception (server kept alive):', err);
+});
 
 // --- Bootstrap ---
 

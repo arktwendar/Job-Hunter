@@ -50,8 +50,9 @@ function extractCountry(location: string | null): string {
   return last;
 }
 
-router.get('/', (_req: Request, res: Response) => {
+router.get('/', (req: Request, res: Response) => {
   const db = getDb();
+  const profileId = req.profile.id;
 
   // Overall totals
   const totals = db.prepare<{ total: number; strong: number; applied: number }>(`
@@ -59,8 +60,8 @@ router.get('/', (_req: Request, res: Response) => {
       COUNT(*) as total,
       SUM(CASE WHEN ai_verdict = 'STRONG_MATCH' AND is_duplicate = 0 THEN 1 ELSE 0 END) as strong,
       SUM(CASE WHEN applied = 1 AND ai_verdict = 'STRONG_MATCH' AND is_duplicate = 0 THEN 1 ELSE 0 END) as applied
-    FROM jobs
-  `).get() as { total: number; strong: number; applied: number };
+    FROM jobs WHERE profile_id = ?
+  `).get(profileId) as { total: number; strong: number; applied: number };
 
   // Status breakdown (all verdicts as counts)
   interface StatusRow { status: string; count: number }
@@ -69,13 +70,13 @@ router.get('/', (_req: Request, res: Response) => {
       CASE WHEN is_duplicate = 1 THEN 'DUPLICATE'
            ELSE COALESCE(ai_verdict, 'UNKNOWN') END as status,
       COUNT(*) as count
-    FROM jobs
+    FROM jobs WHERE profile_id = ?
     GROUP BY status
     ORDER BY count DESC
-  `).all() as StatusRow[];
+  `).all(profileId) as StatusRow[];
 
-  // Per-group stats
-  const groups = db.prepare<SearchGroupRow>('SELECT id, group_name FROM search_groups ORDER BY id ASC').all() as Pick<SearchGroupRow, 'id' | 'group_name'>[];
+  // Per-group stats (for this profile only)
+  const groups = db.prepare<SearchGroupRow>('SELECT id, group_name FROM search_groups WHERE profile_id = ? ORDER BY id ASC').all(profileId) as Pick<SearchGroupRow, 'id' | 'group_name'>[];
 
   interface GroupStat {
     group_id: number | null;
@@ -89,9 +90,9 @@ router.get('/', (_req: Request, res: Response) => {
       COUNT(*) as total,
       SUM(CASE WHEN ai_verdict = 'STRONG_MATCH' AND is_duplicate = 0 THEN 1 ELSE 0 END) as strong,
       SUM(CASE WHEN applied = 1 AND ai_verdict = 'STRONG_MATCH' AND is_duplicate = 0 THEN 1 ELSE 0 END) as applied
-    FROM jobs
+    FROM jobs WHERE profile_id = ?
     GROUP BY group_id
-  `).all() as GroupStat[];
+  `).all(profileId) as GroupStat[];
 
   const groupStatMap = new Map<number | null, GroupStat>();
   for (const row of groupRows) groupStatMap.set(row.group_id, row);
@@ -104,8 +105,8 @@ router.get('/', (_req: Request, res: Response) => {
   // Per-country stats (strong matches only, non-duplicate)
   interface JobLocationRow { location: string | null; applied: number }
   const allStrongJobs = db.prepare<JobLocationRow>(
-    `SELECT location, applied FROM jobs WHERE ai_verdict = 'STRONG_MATCH' AND is_duplicate = 0`,
-  ).all() as JobLocationRow[];
+    `SELECT location, applied FROM jobs WHERE profile_id = ? AND ai_verdict = 'STRONG_MATCH' AND is_duplicate = 0`,
+  ).all(profileId) as JobLocationRow[];
 
   const countryMap = new Map<string, { strong: number; applied: number }>();
   for (const job of allStrongJobs) {
@@ -128,10 +129,10 @@ router.get('/', (_req: Request, res: Response) => {
       CASE WHEN is_duplicate = 1 THEN 'DUPLICATE' ELSE ai_verdict END as verdict,
       COUNT(*) as count
     FROM jobs
-    WHERE date(fetched_at) >= date('now', '-13 days')
+    WHERE profile_id = ? AND date(fetched_at) >= date('now', '-13 days')
     GROUP BY day, group_id, verdict
     ORDER BY day
-  `).all() as DayVerdictRow[];
+  `).all(profileId) as DayVerdictRow[];
 
   // Monthly trend — last 12 months, verdict breakdown per group (filtered client-side)
   interface MonthVerdictRow { month: string; group_id: number | null; verdict: string; count: number }
@@ -142,10 +143,10 @@ router.get('/', (_req: Request, res: Response) => {
       CASE WHEN is_duplicate = 1 THEN 'DUPLICATE' ELSE ai_verdict END as verdict,
       COUNT(*) as count
     FROM jobs
-    WHERE strftime('%Y-%m', fetched_at) >= strftime('%Y-%m', 'now', '-11 months')
+    WHERE profile_id = ? AND strftime('%Y-%m', fetched_at) >= strftime('%Y-%m', 'now', '-11 months')
     GROUP BY month, group_id, verdict
     ORDER BY month
-  `).all() as MonthVerdictRow[];
+  `).all(profileId) as MonthVerdictRow[];
 
   res.render('analytics', {
     totals,

@@ -30,12 +30,13 @@ interface RunWithLogs extends SearchRunRow {
   filteredCount: number;
 }
 
-router.get('/', (_req: Request, res: Response) => {
+router.get('/', (req: Request, res: Response) => {
   const db = getDb();
+  const profileId = req.profile.id;
 
   const runs = db
-    .prepare(`SELECT * FROM search_runs ORDER BY ran_at DESC LIMIT 100`)
-    .all() as SearchRunRow[];
+    .prepare(`SELECT * FROM search_runs WHERE profile_id = ? ORDER BY ran_at DESC LIMIT 100`)
+    .all(profileId) as SearchRunRow[];
 
   const runsWithLogs: RunWithLogs[] = runs.map((run) => {
     const logs = db

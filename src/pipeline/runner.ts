@@ -7,7 +7,7 @@
 
 import { getDb, type SettingsRow, type SearchGroupRow, type BlacklistedCompanyRow } from '../db';
 import { config } from '../config';
-import { fetchJobs, type JobPosting } from './fetcher';
+import { fetchJobs, type JobPosting, type DateRange } from './fetcher';
 import { filterNewJobs } from './deduplicator';
 import { scoreJobs, dedupAndSummarise, buildScoringSystemPrompt, type ScoredJob, type ExistingJob } from './aiScorer';
 import { sendDailyReport, type RunStats } from './emailReport';
@@ -21,15 +21,23 @@ function matchesTitleFilter(title: string, filter: string): boolean {
     .some((line) => line.split(/\W+/).filter(Boolean).every((w) => titleWords.has(w)));
 }
 
-let isRunning = false;
-let lastRunResult: PipelineResult | null = null;
+const isRunningMap = new Map<number, boolean>();
+const lastRunResultMap = new Map<number, PipelineResult | null>();
 
-export function getIsRunning(): boolean {
-  return isRunning;
+export function getIsRunning(profileId: number = 1): boolean {
+  return isRunningMap.get(profileId) ?? false;
 }
 
-export function getRunStatus(): { isRunning: boolean; lastRun: PipelineResult | null } {
-  return { isRunning, lastRun: lastRunResult };
+export function getRunStatus(profileId: number = 1): { isRunning: boolean; lastRun: PipelineResult | null } {
+  return {
+    isRunning: isRunningMap.get(profileId) ?? false,
+    lastRun: lastRunResultMap.get(profileId) ?? null,
+  };
+}
+
+export interface RunOptions {
+  groupIds?: number[];    // if provided, only run these groups (by id)
+  dateRange?: DateRange;  // defaults to '24h'
 }
 
 export interface PipelineResult {
@@ -46,9 +54,9 @@ export interface PipelineResult {
   trigger: 'scheduled' | 'manual';
 }
 
-export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled'): Promise<PipelineResult> {
-  if (isRunning) {
-    console.log('[runner] Pipeline already running; skipping trigger.');
+export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled', profileId: number = 1, options: RunOptions = {}): Promise<PipelineResult> {
+  if (isRunningMap.get(profileId)) {
+    console.log(`[runner] Pipeline already running for profile ${profileId}; skipping trigger.`);
     return {
       ranAt: new Date().toISOString(),
       durationMs: 0,
@@ -64,7 +72,7 @@ export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled')
     };
   }
 
-  isRunning = true;
+  isRunningMap.set(profileId, true);
   const startedAt = Date.now();
   const ranAt = new Date().toISOString();
   const errors: string[] = [];
@@ -80,9 +88,9 @@ export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled')
   try {
     const db = getDb();
 
-    // Load global settings (model, email)
-    const settings = db.prepare('SELECT * FROM settings WHERE id = 1').get() as SettingsRow;
-    if (!settings) throw new Error('Settings not found in database');
+    // Load settings for this profile
+    const settings = db.prepare('SELECT * FROM settings WHERE profile_id = ?').get(profileId) as SettingsRow;
+    if (!settings) throw new Error(`Settings not found for profile ${profileId}`);
 
     // Resolve API keys: DB value takes priority, env vars are fallback
     const apifyToken = settings.apify_api_token || config.apifyApiToken;
@@ -90,33 +98,33 @@ export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled')
     const resendApiKey = settings.resend_api_key || config.resendApiKey;
     const emailFrom = settings.email_from || config.emailFrom;
 
-    // Load all search groups
-    const groups = db.prepare('SELECT * FROM search_groups ORDER BY id ASC').all() as SearchGroupRow[];
+    // Load all search groups for this profile
+    const groups = db.prepare('SELECT * FROM search_groups WHERE profile_id = ? ORDER BY id ASC').all(profileId) as SearchGroupRow[];
     if (groups.length === 0) throw new Error('No roles configured. Add at least one role in Settings.');
 
-    // Load blacklist
+    // Load blacklist for this profile
     const blacklist = db
-      .prepare('SELECT * FROM blacklisted_companies ORDER BY company_name ASC')
-      .all() as BlacklistedCompanyRow[];
+      .prepare('SELECT * FROM blacklisted_companies WHERE profile_id = ? ORDER BY company_name ASC')
+      .all(profileId) as BlacklistedCompanyRow[];
     const blacklistNames = new Set(blacklist.map((b) => b.company_name.toLowerCase().trim()));
 
     console.log(`[runner] Starting pipeline (${trigger}) — ${groups.length} group(s), ${blacklist.length} blacklisted company(ies)`);
 
     // Insert search_runs row NOW to get a stable run_id for job logs
     runId = db.prepare(
-      `INSERT INTO search_runs (ran_at, status, trigger) VALUES (?, 'running', ?)`
-    ).run(ranAt, trigger).lastInsertRowid as number;
+      `INSERT INTO search_runs (profile_id, ran_at, status, trigger) VALUES (?, ?, 'running', ?)`
+    ).run(profileId, ranAt, trigger).lastInsertRowid as number;
 
     console.log(`[runner] Run ID: ${runId}`);
 
     // Prepared statements (shared across groups)
     const insertJob = db.prepare(`
       INSERT OR IGNORE INTO jobs (
-        linkedin_job_id, title, company, location, work_mode, description,
+        profile_id, linkedin_job_id, title, company, location, work_mode, description,
         url, posted_date, fetched_at, ai_score, ai_rationale, ai_summary, ai_verdict,
         is_duplicate, duplicate_of_job_id, seen, seen_at, group_id, rejection_category,
         apply_url
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const insertJobLog = db.prepare(`
@@ -137,10 +145,16 @@ export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled')
     // Persists across groups so cross-group same-run duplicates are also caught.
     const seenStrongInRun = new Set<string>();
 
+    const { groupIds, dateRange = '24h' } = options;
+
     // --- Per-group loop ---
     for (const group of groups) {
       if (!group.is_active) {
         console.log(`[runner] Group ${group.id} is inactive, skipping.`);
+        continue;
+      }
+      if (groupIds && groupIds.length > 0 && !groupIds.includes(group.id)) {
+        console.log(`[runner] Group ${group.id} not in selected groupIds, skipping.`);
         continue;
       }
 
@@ -160,7 +174,7 @@ export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled')
           locations,
           workModes,
           jobType: group.job_type,
-        }, apifyToken);
+        }, apifyToken, dateRange);
       } catch (err) {
         const msg = `Group ${group.id} fetch error: ${(err as Error).message}`;
         console.error('[runner]', msg);
@@ -349,7 +363,7 @@ export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled')
         db.transaction(() => {
           for (const job of blacklistedJobs) {
             insertJob.run(
-              job.jobId, job.title, job.company,
+              profileId, job.jobId, job.title, job.company,
               job.location || null, job.workMode || null, job.description || '',
               job.url || null, job.postedDate || null, now,
               0, null, null, 'BLACKLISTED',
@@ -369,7 +383,7 @@ export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled')
           for (const { scored, isDuplicate, duplicateOfId, summary } of jobResults) {
             const { job } = scored;
             insertJob.run(
-              job.jobId, job.title, job.company,
+              profileId, job.jobId, job.title, job.company,
               job.location || null, job.workMode || null, job.description || '',
               job.url || null, job.postedDate || null, now,
               scored.score, scored.rationale || null,
@@ -432,7 +446,7 @@ export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled')
       jobsStrongMatch, jobsWeakMatch, jobsNoMatch, jobsDuplicate,
       status, errorLog: errors.length > 0 ? errors.join('\n') : null, trigger,
     };
-    lastRunResult = result;
+    lastRunResultMap.set(profileId, result);
     return result;
 
   } catch (err) {
@@ -449,10 +463,10 @@ export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled')
       } else {
         // run_id was never created (e.g. DB unavailable at start); fall back to insert
         db.prepare(`
-          INSERT INTO search_runs (ran_at, jobs_fetched, jobs_scored, jobs_strong_match,
+          INSERT INTO search_runs (profile_id, ran_at, jobs_fetched, jobs_scored, jobs_strong_match,
             jobs_weak_match, jobs_no_match, jobs_duplicate, status, error_log, duration_ms, trigger)
-          VALUES (?, 0, 0, 0, 0, 0, 0, 'failed', ?, ?, ?)
-        `).run(ranAt, errorMsg, durationMs, trigger);
+          VALUES (?, ?, 0, 0, 0, 0, 0, 0, 'failed', ?, ?, ?)
+        `).run(profileId, ranAt, errorMsg, durationMs, trigger);
       }
     } catch (_) { /* ignore DB logging failure */ }
 
@@ -461,10 +475,10 @@ export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled')
       jobsStrongMatch: 0, jobsWeakMatch: 0, jobsNoMatch: 0, jobsDuplicate: 0,
       status: 'failed', errorLog: errorMsg, trigger,
     };
-    lastRunResult = result;
+    lastRunResultMap.set(profileId, result);
     return result;
 
   } finally {
-    isRunning = false;
+    isRunningMap.set(profileId, false);
   }
 }

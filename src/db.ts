@@ -124,6 +124,7 @@ export function getDb(): Database {
   initSchema(_db);
   runMigrations(_db);
   seedSettings(_db);
+  ensureProfileIndexes(_db);
 
   return _db;
 }
@@ -378,6 +379,159 @@ function runMigrations(db: Database): void {
     console.warn('[db] Migration (search_groups prompt fields) failed (non-fatal):', (err as Error).message);
   }
 
+  // v19: add schedule_group_ids to settings if missing
+  try {
+    const cols = db.prepare(`PRAGMA table_info(settings)`).all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === 'schedule_group_ids')) {
+      db.exec(`ALTER TABLE settings ADD COLUMN schedule_group_ids TEXT NOT NULL DEFAULT ''`);
+      console.log('[db] Migration applied: settings.schedule_group_ids column added');
+    }
+  } catch (err) {
+    console.warn('[db] Migration (schedule_group_ids) failed (non-fatal):', (err as Error).message);
+  }
+
+  // v18: add schedule_date_range to settings if missing
+  try {
+    const cols = db.prepare(`PRAGMA table_info(settings)`).all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === 'schedule_date_range')) {
+      db.exec(`ALTER TABLE settings ADD COLUMN schedule_date_range TEXT NOT NULL DEFAULT '24h'`);
+      console.log('[db] Migration applied: settings.schedule_date_range column added');
+    }
+  } catch (err) {
+    console.warn('[db] Migration (schedule_date_range) failed (non-fatal):', (err as Error).message);
+  }
+
+  // v17: multi-profile — add profile_id to all major tables
+
+  // settings: recreate without CHECK(id=1) constraint, add profile_id, seed Arina's row
+  try {
+    const cols = db.prepare('PRAGMA table_info(settings)').all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === 'profile_id')) {
+      // Create new table without CHECK constraint
+      db.exec(`
+        CREATE TABLE settings_v17 (
+          id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+          profile_id             INTEGER NOT NULL DEFAULT 1,
+          search_keywords        TEXT    NOT NULL DEFAULT '',
+          search_locations       TEXT    NOT NULL DEFAULT '',
+          search_work_modes      TEXT    NOT NULL DEFAULT '',
+          search_job_type        TEXT    NOT NULL DEFAULT 'fullTime',
+          cron_schedule          TEXT    NOT NULL DEFAULT '0 7 * * *',
+          ai_system_prompt       TEXT    NOT NULL DEFAULT '',
+          ai_model               TEXT    NOT NULL DEFAULT 'gpt-5.4',
+          dedup_system_prompt    TEXT    NOT NULL DEFAULT '',
+          score_no_match_max     INTEGER NOT NULL DEFAULT 50,
+          score_weak_match_max   INTEGER NOT NULL DEFAULT 70,
+          score_strong_match_min INTEGER NOT NULL DEFAULT 71,
+          email_recipient        TEXT    NOT NULL DEFAULT '',
+          email_send_time        TEXT    NOT NULL DEFAULT '07:00',
+          summary_prompt         TEXT    NOT NULL DEFAULT '',
+          apify_api_token        TEXT    NOT NULL DEFAULT '',
+          openai_api_key         TEXT    NOT NULL DEFAULT '',
+          resend_api_key         TEXT    NOT NULL DEFAULT '',
+          email_from             TEXT    NOT NULL DEFAULT '',
+          email_enabled          INTEGER NOT NULL DEFAULT 1,
+          timezone               TEXT    NOT NULL DEFAULT 'UTC',
+          profile_description    TEXT    NOT NULL DEFAULT '',
+          scoring_criteria       TEXT    NOT NULL DEFAULT '',
+          scoring_guide          TEXT    NOT NULL DEFAULT '',
+          no_match_criteria      TEXT    NOT NULL DEFAULT '',
+          updated_at             TEXT    NOT NULL DEFAULT ''
+        )
+      `);
+      db.exec(`
+        INSERT INTO settings_v17
+          SELECT id, 1,
+            COALESCE(search_keywords,''), COALESCE(search_locations,''),
+            COALESCE(search_work_modes,''), COALESCE(search_job_type,'fullTime'),
+            COALESCE(cron_schedule,'0 7 * * *'), COALESCE(ai_system_prompt,''),
+            COALESCE(ai_model,'gpt-5.4'), COALESCE(dedup_system_prompt,''),
+            COALESCE(score_no_match_max,50), COALESCE(score_weak_match_max,70),
+            COALESCE(score_strong_match_min,71),
+            COALESCE(email_recipient,''), COALESCE(email_send_time,'07:00'),
+            COALESCE(summary_prompt,''), COALESCE(apify_api_token,''),
+            COALESCE(openai_api_key,''), COALESCE(resend_api_key,''),
+            COALESCE(email_from,''), COALESCE(email_enabled,1),
+            COALESCE(timezone,'UTC'), COALESCE(profile_description,''),
+            COALESCE(scoring_criteria,''), COALESCE(scoring_guide,''),
+            COALESCE(no_match_criteria,''), COALESCE(updated_at,'')
+          FROM settings WHERE id = 1
+      `);
+      db.exec(`DROP TABLE settings`);
+      db.exec(`ALTER TABLE settings_v17 RENAME TO settings`);
+      // Seed Arina's row: clone API keys but clear email_recipient and profile prompts
+      db.exec(`
+        INSERT INTO settings
+          SELECT NULL, 2,
+            search_keywords, search_locations, search_work_modes, search_job_type,
+            cron_schedule, ai_system_prompt, ai_model, dedup_system_prompt,
+            score_no_match_max, score_weak_match_max, score_strong_match_min,
+            '', email_send_time, summary_prompt,
+            apify_api_token, openai_api_key, resend_api_key, email_from,
+            email_enabled, timezone,
+            '', '', '', '', updated_at
+          FROM settings WHERE profile_id = 1
+      `);
+      console.log('[db] Migration v17: settings recreated with profile_id, Arina row seeded');
+    }
+  } catch (err) {
+    console.warn('[db] Migration v17 (settings) failed (non-fatal):', (err as Error).message);
+  }
+
+  // search_groups: add profile_id
+  try {
+    const cols = db.prepare('PRAGMA table_info(search_groups)').all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === 'profile_id')) {
+      db.exec(`ALTER TABLE search_groups ADD COLUMN profile_id INTEGER NOT NULL DEFAULT 1`);
+      // Assign "Head of marketing" group to Arina
+      db.prepare(`UPDATE search_groups SET profile_id = 2 WHERE group_name = 'Head of marketing'`).run();
+      console.log('[db] Migration v17: search_groups.profile_id added');
+    }
+  } catch (err) {
+    console.warn('[db] Migration v17 (search_groups.profile_id) failed (non-fatal):', (err as Error).message);
+  }
+
+  // jobs: add profile_id, populate from group
+  try {
+    const cols = db.prepare('PRAGMA table_info(jobs)').all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === 'profile_id')) {
+      db.exec(`ALTER TABLE jobs ADD COLUMN profile_id INTEGER NOT NULL DEFAULT 1`);
+      // Jobs whose group belongs to Arina → set profile_id=2
+      db.exec(`
+        UPDATE jobs SET profile_id = 2
+        WHERE group_id IN (SELECT id FROM search_groups WHERE profile_id = 2)
+      `);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_jobs_profile_id ON jobs(profile_id)`);
+      console.log('[db] Migration v17: jobs.profile_id added');
+    }
+  } catch (err) {
+    console.warn('[db] Migration v17 (jobs.profile_id) failed (non-fatal):', (err as Error).message);
+  }
+
+  // search_runs: add profile_id
+  try {
+    const cols = db.prepare('PRAGMA table_info(search_runs)').all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === 'profile_id')) {
+      db.exec(`ALTER TABLE search_runs ADD COLUMN profile_id INTEGER NOT NULL DEFAULT 1`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_runs_profile ON search_runs(profile_id)`);
+      console.log('[db] Migration v17: search_runs.profile_id added');
+    }
+  } catch (err) {
+    console.warn('[db] Migration v17 (search_runs.profile_id) failed (non-fatal):', (err as Error).message);
+  }
+
+  // blacklisted_companies: add profile_id
+  try {
+    const cols = db.prepare('PRAGMA table_info(blacklisted_companies)').all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === 'profile_id')) {
+      db.exec(`ALTER TABLE blacklisted_companies ADD COLUMN profile_id INTEGER NOT NULL DEFAULT 1`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_blacklist_profile ON blacklisted_companies(profile_id)`);
+      console.log('[db] Migration v17: blacklisted_companies.profile_id added');
+    }
+  } catch (err) {
+    console.warn('[db] Migration v17 (blacklisted_companies.profile_id) failed (non-fatal):', (err as Error).message);
+  }
+
   // v8: seed default search group from settings row if groups table is empty
   try {
     const groupCount = (
@@ -413,6 +567,7 @@ function initSchema(db: Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS search_groups (
       id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+      profile_id              INTEGER NOT NULL DEFAULT 1,
       locations               TEXT    NOT NULL,
       keywords                TEXT    NOT NULL,
       job_type                TEXT    NOT NULL DEFAULT 'fullTime',
@@ -427,6 +582,7 @@ function initSchema(db: Database): void {
 
     CREATE TABLE IF NOT EXISTS jobs (
       id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+      profile_id            INTEGER NOT NULL DEFAULT 1,
       linkedin_job_id       TEXT    UNIQUE NOT NULL,
       title                 TEXT    NOT NULL,
       company               TEXT    NOT NULL,
@@ -456,6 +612,7 @@ function initSchema(db: Database): void {
 
     CREATE TABLE IF NOT EXISTS search_runs (
       id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      profile_id          INTEGER NOT NULL DEFAULT 1,
       ran_at              TEXT    NOT NULL,
       jobs_fetched        INTEGER NOT NULL DEFAULT 0,
       jobs_scored         INTEGER NOT NULL DEFAULT 0,
@@ -493,69 +650,120 @@ function initSchema(db: Database): void {
 
     CREATE TABLE IF NOT EXISTS blacklisted_companies (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
-      company_name TEXT    NOT NULL UNIQUE,
+      profile_id   INTEGER NOT NULL DEFAULT 1,
+      company_name TEXT    NOT NULL,
       notes        TEXT    NOT NULL DEFAULT '',
-      created_at   TEXT    NOT NULL
+      created_at   TEXT    NOT NULL,
+      UNIQUE (profile_id, company_name)
     );
 
-    CREATE INDEX IF NOT EXISTS idx_blacklist_company ON blacklisted_companies(company_name);
 
     CREATE TABLE IF NOT EXISTS settings (
-      id                     INTEGER PRIMARY KEY CHECK (id = 1),
-      search_keywords        TEXT    NOT NULL,
-      search_locations       TEXT    NOT NULL,
-      search_work_modes      TEXT    NOT NULL,
+      id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+      profile_id             INTEGER NOT NULL DEFAULT 1,
+      search_keywords        TEXT    NOT NULL DEFAULT '',
+      search_locations       TEXT    NOT NULL DEFAULT '',
+      search_work_modes      TEXT    NOT NULL DEFAULT '',
       search_job_type        TEXT    NOT NULL DEFAULT 'fullTime',
       cron_schedule          TEXT    NOT NULL DEFAULT '0 7 * * *',
-      ai_system_prompt       TEXT    NOT NULL,
-      ai_model               TEXT    NOT NULL DEFAULT 'gpt-4o-mini',
+      ai_system_prompt       TEXT    NOT NULL DEFAULT '',
+      ai_model               TEXT    NOT NULL DEFAULT 'gpt-5.4',
       dedup_system_prompt    TEXT    NOT NULL DEFAULT '',
       score_no_match_max     INTEGER NOT NULL DEFAULT 50,
       score_weak_match_max   INTEGER NOT NULL DEFAULT 70,
       score_strong_match_min INTEGER NOT NULL DEFAULT 71,
-      email_recipient        TEXT    NOT NULL DEFAULT 'faranor@gmail.com',
+      email_recipient        TEXT    NOT NULL DEFAULT '',
       email_send_time        TEXT    NOT NULL DEFAULT '07:00',
-      updated_at             TEXT    NOT NULL
+      summary_prompt         TEXT    NOT NULL DEFAULT '',
+      apify_api_token        TEXT    NOT NULL DEFAULT '',
+      openai_api_key         TEXT    NOT NULL DEFAULT '',
+      resend_api_key         TEXT    NOT NULL DEFAULT '',
+      email_from             TEXT    NOT NULL DEFAULT '',
+      email_enabled          INTEGER NOT NULL DEFAULT 1,
+      timezone               TEXT    NOT NULL DEFAULT 'UTC',
+      profile_description    TEXT    NOT NULL DEFAULT '',
+      scoring_criteria       TEXT    NOT NULL DEFAULT '',
+      scoring_guide          TEXT    NOT NULL DEFAULT '',
+      no_match_criteria      TEXT    NOT NULL DEFAULT '',
+      updated_at             TEXT    NOT NULL DEFAULT ''
     );
   `);
 }
 
+// Create profile_id indexes after migrations have added the columns (safe with IF NOT EXISTS)
+function ensureProfileIndexes(db: Database): void {
+  try { db.exec(`CREATE INDEX IF NOT EXISTS idx_jobs_profile_id ON jobs(profile_id)`); } catch (_) {}
+  try { db.exec(`CREATE INDEX IF NOT EXISTS idx_runs_profile ON search_runs(profile_id)`); } catch (_) {}
+  try { db.exec(`CREATE INDEX IF NOT EXISTS idx_blacklist_profile ON blacklisted_companies(profile_id)`); } catch (_) {}
+}
+
 function seedSettings(db: Database): void {
-  const existing = db.prepare('SELECT id FROM settings WHERE id = 1').get();
-  if (existing) return;
+  const now = new Date().toISOString();
 
-  db.prepare(`
-    INSERT INTO settings (
-      id, search_keywords, search_locations, search_work_modes,
-      search_job_type, cron_schedule, ai_system_prompt, ai_model,
-      dedup_system_prompt,
-      score_no_match_max, score_weak_match_max, score_strong_match_min,
-      email_recipient, email_send_time, updated_at
-    ) VALUES (
-      1, ?, ?, ?,
-      'fullTime', '0 7 * * *', ?, 'gpt-5.4',
-      ?,
-      50, 70, 71,
-      '', '07:00', ?
-    )
-  `).run(
-    DEFAULT_KEYWORDS,
-    DEFAULT_LOCATIONS,
-    JSON.stringify(['remote', 'hybrid', 'onsite']),
-    DEFAULT_AI_SYSTEM_PROMPT,
-    DEFAULT_DEDUP_SYSTEM_PROMPT,
-    new Date().toISOString(),
-  );
+  // Seed Mikhail's settings (profile_id=1)
+  const existing1 = db.prepare('SELECT id FROM settings WHERE profile_id = 1').get();
+  if (!existing1) {
+    db.prepare(`
+      INSERT INTO settings (
+        profile_id, search_keywords, search_locations, search_work_modes,
+        search_job_type, cron_schedule, ai_system_prompt, ai_model,
+        dedup_system_prompt,
+        score_no_match_max, score_weak_match_max, score_strong_match_min,
+        email_recipient, email_send_time, updated_at
+      ) VALUES (
+        1, ?, ?, ?,
+        'fullTime', '0 7 * * *', ?, 'gpt-5.4',
+        ?,
+        50, 70, 71,
+        '', '07:00', ?
+      )
+    `).run(
+      DEFAULT_KEYWORDS,
+      DEFAULT_LOCATIONS,
+      JSON.stringify(['remote', 'hybrid', 'onsite']),
+      DEFAULT_AI_SYSTEM_PROMPT,
+      DEFAULT_DEDUP_SYSTEM_PROMPT,
+      now,
+    );
+    console.log('[db] Settings seeded for Mikhail (profile_id=1).');
+  }
 
-  // Also seed the first search group for brand-new installs
+  // Seed Arina's settings (profile_id=2)
+  const existing2 = db.prepare('SELECT id FROM settings WHERE profile_id = 2').get();
+  if (!existing2) {
+    db.prepare(`
+      INSERT INTO settings (
+        profile_id, search_keywords, search_locations, search_work_modes,
+        search_job_type, cron_schedule, ai_system_prompt, ai_model,
+        dedup_system_prompt,
+        score_no_match_max, score_weak_match_max, score_strong_match_min,
+        email_recipient, email_send_time, updated_at
+      ) VALUES (
+        2, ?, ?, ?,
+        'fullTime', '0 7 * * *', ?, 'gpt-5.4',
+        ?,
+        50, 70, 71,
+        '', '07:00', ?
+      )
+    `).run(
+      DEFAULT_KEYWORDS,
+      DEFAULT_LOCATIONS,
+      JSON.stringify(['remote', 'hybrid', 'onsite']),
+      DEFAULT_AI_SYSTEM_PROMPT,
+      DEFAULT_DEDUP_SYSTEM_PROMPT,
+      now,
+    );
+    console.log('[db] Settings seeded for Arina (profile_id=2).');
+  }
+
+  // Also seed the first search group for brand-new installs (under Mikhail)
   const groupCount = (
     db.prepare('SELECT COUNT(*) as c FROM search_groups').get() as { c: number }
   ).c;
   if (groupCount === 0) {
-    const now = new Date().toISOString();
     db.prepare(`
-      INSERT INTO search_groups (locations, keywords, job_type, work_modes, ai_system_prompt, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO search_groups (profile_id, locations, keywords, job_type, work_modes, ai_system_prompt, created_at, updated_at)
+      VALUES (1, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       DEFAULT_LOCATIONS,
       DEFAULT_KEYWORDS,
@@ -566,14 +774,13 @@ function seedSettings(db: Database): void {
       now,
     );
   }
-
-  console.log('[db] Settings table seeded with defaults.');
 }
 
 // ---- Row types ----
 
 export interface JobRow {
   id: number;
+  profile_id: number;
   linkedin_job_id: string;
   title: string;
   company: string;
@@ -600,6 +807,7 @@ export interface JobRow {
 
 export interface SearchRunRow {
   id: number;
+  profile_id: number;
   ran_at: string;
   jobs_fetched: number;
   jobs_scored: number;
@@ -615,6 +823,7 @@ export interface SearchRunRow {
 
 export interface SettingsRow {
   id: number;
+  profile_id: number;
   search_keywords: string;
   search_locations: string;
   search_work_modes: string;
@@ -639,6 +848,8 @@ export interface SettingsRow {
   scoring_criteria: string;
   scoring_guide: string;
   no_match_criteria: string;
+  schedule_date_range: string;  // '24h' | '7d'
+  schedule_group_ids: string;   // JSON number[] | '' for all active
   updated_at: string;
 }
 
@@ -660,6 +871,7 @@ export interface RunJobLogRow {
 
 export interface BlacklistedCompanyRow {
   id: number;
+  profile_id: number;
   company_name: string;
   notes: string;
   created_at: string;
@@ -667,6 +879,7 @@ export interface BlacklistedCompanyRow {
 
 export interface SearchGroupRow {
   id: number;
+  profile_id: number;
   group_name: string;
   locations: string;         // JSON string[]
   keywords: string;          // JSON string[]

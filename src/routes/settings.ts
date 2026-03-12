@@ -8,18 +8,20 @@ import { getDb, type SettingsRow, type SearchGroupRow } from '../db';
 
 const router = Router();
 
-function getGroups(db: ReturnType<typeof getDb>): SearchGroupRow[] {
-  return db.prepare('SELECT * FROM search_groups ORDER BY id ASC').all() as SearchGroupRow[];
+function getGroups(db: ReturnType<typeof getDb>, profileId: number): SearchGroupRow[] {
+  return db.prepare('SELECT * FROM search_groups WHERE profile_id = ? ORDER BY id ASC').all(profileId) as SearchGroupRow[];
 }
 
-router.get('/', (_req: Request, res: Response) => {
+router.get('/', (req: Request, res: Response) => {
   const db = getDb();
-  const settings = db.prepare('SELECT * FROM settings WHERE id = 1').get() as SettingsRow;
-  res.render('settings', { settings, groups: getGroups(db), title: 'Settings', saved: false, error: null });
+  const profileId = req.profile.id;
+  const settings = db.prepare('SELECT * FROM settings WHERE profile_id = ?').get(profileId) as SettingsRow;
+  res.render('settings', { settings, groups: getGroups(db, profileId), title: 'Settings', saved: false, error: null });
 });
 
 router.post('/', (req: Request, res: Response) => {
   const db = getDb();
+  const profileId = req.profile.id;
 
   try {
     const body = req.body as Record<string, string | string[]>;
@@ -36,7 +38,7 @@ router.post('/', (req: Request, res: Response) => {
         email_from = ?,
         email_enabled = ?,
         updated_at = ?
-      WHERE id = 1
+      WHERE profile_id = ?
     `).run(
       String(body.ai_model || 'gpt-5.4'),
       String(body.dedup_system_prompt || ''),
@@ -48,15 +50,16 @@ router.post('/', (req: Request, res: Response) => {
       String(body.email_from || ''),
       (body.email_enabled === 'on' || body.email_enabled === '1') ? 1 : 0,
       new Date().toISOString(),
+      profileId,
     );
 
-    const updated = db.prepare('SELECT * FROM settings WHERE id = 1').get() as SettingsRow;
-    res.render('settings', { settings: updated, groups: getGroups(db), title: 'Settings', saved: true, error: null });
+    const updated = db.prepare('SELECT * FROM settings WHERE profile_id = ?').get(profileId) as SettingsRow;
+    res.render('settings', { settings: updated, groups: getGroups(db, profileId), title: 'Settings', saved: true, error: null });
   } catch (err) {
-    const settings = db.prepare('SELECT * FROM settings WHERE id = 1').get() as SettingsRow;
+    const settings = db.prepare('SELECT * FROM settings WHERE profile_id = ?').get(profileId) as SettingsRow;
     res.status(400).render('settings', {
       settings,
-      groups: getGroups(db),
+      groups: getGroups(db, profileId),
       title: 'Settings',
       saved: false,
       error: (err as Error).message,
