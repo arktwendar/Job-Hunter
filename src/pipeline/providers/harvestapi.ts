@@ -102,7 +102,8 @@ export async function fetchWithHarvestApi(
     maxItems: 100,
   };
 
-  console.log(`[harvestapi] Starting actor run — ${filters.keywords.length} keywords × ${filters.locations.length} locations`);
+  const keywordsStr = filters.keywords.map((k) => `"${k}"`).join(', ');
+  console.log(`[harvestapi] Starting actor run — ${filters.keywords.length} keywords × ${filters.locations.length} locations: ${keywordsStr}`);
 
   let lastErr: unknown;
   for (let attempt = 1; attempt <= FETCH_MAX_ATTEMPTS; attempt++) {
