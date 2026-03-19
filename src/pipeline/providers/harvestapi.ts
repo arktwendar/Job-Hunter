@@ -74,6 +74,16 @@ function mapToJobPosting(item: HarvestJob): JobPosting {
   };
 }
 
+const WORK_MODE_MAP: Record<string, string> = {
+  onsite: 'office',
+  hybrid: 'hybrid',
+  remote: 'remote',
+};
+
+function mapWorkModes(workModes: string[]): string[] {
+  return workModes.map((m) => WORK_MODE_MAP[m]).filter(Boolean);
+}
+
 function getPostedLimit(dateRange: DateRange): string {
   if (dateRange === '24h') return '24h';
   if (dateRange === '7d') return 'week';
@@ -94,12 +104,15 @@ export async function fetchWithHarvestApi(
 ): Promise<FetchResult> {
   const client = new ApifyClient({ token: apifyToken });
 
+  const workplaceType = mapWorkModes(filters.workModes);
+
   const actorInput: Record<string, unknown> = {
     jobTitles: filters.keywords,
     locations: filters.locations,
     postedLimit: getPostedLimit(dateRange),
     sortBy: 'date',
     maxItems: 100,
+    ...(workplaceType.length > 0 && { workplaceType }),
   };
 
   const keywordsStr = filters.keywords.map((k) => `"${k}"`).join(', ');
