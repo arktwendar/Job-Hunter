@@ -12,7 +12,7 @@ function verdictChip(verdict) {
   if (verdict === 'STRONG_MATCH')
     return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 whitespace-nowrap">Strong fit</span>';
   if (verdict === 'WEAK_MATCH')
-    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 whitespace-nowrap">Weak fit</span>';
+    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700 whitespace-nowrap">Weak fit</span>';
   if (verdict === 'NO_MATCH')
     return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 whitespace-nowrap">No fit</span>';
   if (verdict === 'DUPLICATE')
@@ -27,7 +27,7 @@ function verdictChip(verdict) {
 function scoreColor(score) {
   if (score == null) return 'text-gray-300';
   if (score >= 71) return 'text-emerald-600 font-semibold';
-  if (score >= 51) return 'text-amber-600 font-semibold';
+  if (score >= 51) return 'text-yellow-600 font-semibold';
   return 'text-red-500';
 }
 %>
@@ -163,7 +163,7 @@ function jobTable(jobs) {
   <div class="mt-1 pt-1 border-t border-gray-100">
     <p class="px-3 py-1 text-xs font-medium text-gray-400">Change verdict</p>
     <button onclick="menuSetVerdict('STRONG_MATCH')" class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-emerald-50 text-emerald-700 w-full text-left transition-colors">✅ Strong fit</button>
-    <button onclick="menuSetVerdict('WEAK_MATCH')"   class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-amber-50 text-amber-700 w-full text-left transition-colors">⚠️ Weak fit</button>
+    <button onclick="menuSetVerdict('WEAK_MATCH')"   class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-yellow-50 text-yellow-700 w-full text-left transition-colors">⚠️ Weak fit</button>
     <button onclick="menuSetVerdict('NO_MATCH')"     class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-red-50 text-red-600 w-full text-left transition-colors">❌ No fit</button>
   </div>
 </div>
@@ -201,7 +201,7 @@ function showJobMenu(event, el) {
 
 function verdictChipStatic(verdict) {
   if (verdict === 'STRONG_MATCH') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 whitespace-nowrap">Strong fit</span>';
-  if (verdict === 'WEAK_MATCH')   return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 whitespace-nowrap">Weak fit</span>';
+  if (verdict === 'WEAK_MATCH')   return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700 whitespace-nowrap">Weak fit</span>';
   if (verdict === 'NO_MATCH')     return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 whitespace-nowrap">No fit</span>';
   if (verdict === 'DUPLICATE')    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-600 whitespace-nowrap">Duplicate</span>';
   if (verdict === 'BLACKLISTED')  return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 whitespace-nowrap">Blacklisted</span>';

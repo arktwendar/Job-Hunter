@@ -254,7 +254,7 @@
   <div id="verdict-dropdown" class="hidden fixed z-50 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden" style="min-width:148px">
     <div class="py-1">
       <button onclick="setVerdict('STRONG_MATCH')" class="w-full text-left px-4 py-2 text-sm hover:bg-emerald-50 text-emerald-700 font-medium">✅ Strong fit</button>
-      <button onclick="setVerdict('WEAK_MATCH')"   class="w-full text-left px-4 py-2 text-sm hover:bg-amber-50 text-amber-700 font-medium">⚠️ Weak fit</button>
+      <button onclick="setVerdict('WEAK_MATCH')"   class="w-full text-left px-4 py-2 text-sm hover:bg-yellow-50 text-yellow-700 font-medium">⚠️ Weak fit</button>
       <button onclick="setVerdict('NO_MATCH')"     class="w-full text-left px-4 py-2 text-sm hover:bg-red-50 text-red-600 font-medium">❌ No fit</button>
       <button onclick="setVerdict('DUPLICATE')"    class="w-full text-left px-4 py-2 text-sm hover:bg-purple-50 text-purple-600 font-medium">🔁 Duplicate</button>
     </div>
@@ -986,19 +986,19 @@
     function verdictChipHTML(verdict, style) {
       const detail = {
         STRONG_MATCH: '<span class="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">STRONG MATCH ▾</span>',
-        WEAK_MATCH:   '<span class="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">WEAK MATCH ▾</span>',
+        WEAK_MATCH:   '<span class="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700 border border-yellow-200">WEAK MATCH ▾</span>',
         NO_MATCH:     '<span class="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-600 border border-red-200">NO MATCH ▾</span>',
         DUPLICATE:    '<span class="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-600 border border-purple-200">DUPLICATE ▾</span>',
       };
       const compact = {
         STRONG_MATCH: '<span class="px-1.5 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700 whitespace-nowrap">Strong ▾</span>',
-        WEAK_MATCH:   '<span class="px-1.5 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 whitespace-nowrap">Weak ▾</span>',
+        WEAK_MATCH:   '<span class="px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-50 text-yellow-700 whitespace-nowrap">Weak ▾</span>',
         NO_MATCH:     '<span class="px-1.5 py-0.5 rounded text-xs font-medium bg-red-50 text-red-500 whitespace-nowrap">No match ▾</span>',
         DUPLICATE:    '<span class="px-1.5 py-0.5 rounded text-xs font-medium bg-purple-50 text-purple-600 whitespace-nowrap">Duplicate ▾</span>',
       };
       const full = {
         STRONG_MATCH: '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 whitespace-nowrap">✅ Strong fit ▾</span>',
-        WEAK_MATCH:   '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 whitespace-nowrap">⚠️ Weak fit ▾</span>',
+        WEAK_MATCH:   '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700 whitespace-nowrap">⚠️ Weak fit ▾</span>',
         NO_MATCH:     '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 whitespace-nowrap">❌ No fit ▾</span>',
         DUPLICATE:    '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-600 whitespace-nowrap">🔁 Duplicate ▾</span>',
       };

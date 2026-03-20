@@ -12,7 +12,7 @@ function fmtDate(iso) {
 
 function statusBadge(status) {
   if (status === 'success')       return 'bg-emerald-50 text-emerald-700';
-  if (status === 'partial_error') return 'bg-amber-50 text-amber-700';
+  if (status === 'partial_error') return 'bg-yellow-50 text-yellow-700';
   if (status === 'running')       return 'bg-blue-50 text-blue-700';
   return 'bg-red-50 text-red-600';
 }
@@ -26,7 +26,7 @@ function verdictChip(verdict, rejectionCategory) {
   if (verdict === 'STRONG_MATCH')
     return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 whitespace-nowrap">✅ Strong fit</span>';
   if (verdict === 'WEAK_MATCH')
-    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 whitespace-nowrap">⚠️ Weak fit</span>';
+    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700 whitespace-nowrap">⚠️ Weak fit</span>';
   if (verdict === 'BLACKLISTED')
     return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 whitespace-nowrap">🚫 Blacklisted</span>';
   if (verdict === 'DUPLICATE')
@@ -105,7 +105,7 @@ function verdictChip(verdict, rejectionCategory) {
       <span class="text-xs text-gray-500 hidden sm:block">
         <span class="font-medium text-gray-700"><%= run.jobs_fetched %></span> fetched
         · <span class="font-medium text-emerald-600"><%= run.jobs_strong_match %></span> strong
-        · <span class="font-medium text-amber-600"><%= run.jobs_weak_match %></span> weak
+        · <span class="font-medium text-yellow-600"><%= run.jobs_weak_match %></span> weak
         · <span class="font-medium text-red-500"><%= run.jobs_no_match %></span> no match
         · <span class="font-medium text-purple-600"><%= run.jobs_duplicate %></span> duplicates
         <% if (run.filteredCount > 0) { %>· <span class="font-medium text-slate-500"><%= run.filteredCount %></span> filtered<% } %>
@@ -203,7 +203,7 @@ function verdictChip(verdict, rejectionCategory) {
             </td>
             <td class="px-3 py-2.5 text-xs w-0 text-center whitespace-nowrap">
               <% if (job.ai_score != null) { %>
-                <span class="<%= job.ai_score >= 71 ? 'text-emerald-600 font-semibold' : job.ai_score >= 51 ? 'text-amber-600 font-semibold' : 'text-red-500' %>"><%= job.ai_score %></span>
+                <span class="<%= job.ai_score >= 71 ? 'text-emerald-600 font-semibold' : job.ai_score >= 51 ? 'text-yellow-600 font-semibold' : 'text-red-500' %>"><%= job.ai_score %></span>
               <% } else { %>
                 <span class="text-gray-300">—</span>
               <% } %>
@@ -271,7 +271,7 @@ function verdictChip(verdict, rejectionCategory) {
               </td>
               <td class="px-3 py-2.5 text-xs w-0 text-center whitespace-nowrap">
                 <% if (job.ai_score != null) { %>
-                  <span class="<%= job.ai_score >= 71 ? 'text-emerald-600 font-semibold' : job.ai_score >= 51 ? 'text-amber-600 font-semibold' : 'text-red-500' %>"><%= job.ai_score %></span>
+                  <span class="<%= job.ai_score >= 71 ? 'text-emerald-600 font-semibold' : job.ai_score >= 51 ? 'text-yellow-600 font-semibold' : 'text-red-500' %>"><%= job.ai_score %></span>
                 <% } else { %>
                   <span class="text-gray-300">—</span>
                 <% } %>
@@ -335,7 +335,7 @@ function verdictChip(verdict, rejectionCategory) {
   <div id="job-menu-verdict-section" class="mt-1 pt-1 border-t border-gray-100">
     <p class="px-3 py-1 text-xs font-medium text-gray-400">Change verdict</p>
     <button onclick="menuSetVerdict('STRONG_MATCH')" class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-emerald-50 text-emerald-700 w-full text-left transition-colors">✅ Strong fit</button>
-    <button onclick="menuSetVerdict('WEAK_MATCH')"   class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-amber-50 text-amber-700 w-full text-left transition-colors">⚠️ Weak fit</button>
+    <button onclick="menuSetVerdict('WEAK_MATCH')"   class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-yellow-50 text-yellow-700 w-full text-left transition-colors">⚠️ Weak fit</button>
     <button onclick="menuSetVerdict('NO_MATCH')"     class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-red-50 text-red-600 w-full text-left transition-colors">❌ No fit</button>
   </div>
 </div>
@@ -374,7 +374,7 @@ function showJobMenu(event, el) {
 
 function verdictChipStatic(verdict) {
   if (verdict === 'STRONG_MATCH') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 whitespace-nowrap">✅ Strong fit</span>';
-  if (verdict === 'WEAK_MATCH')   return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 whitespace-nowrap">⚠️ Weak fit</span>';
+  if (verdict === 'WEAK_MATCH')   return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700 whitespace-nowrap">⚠️ Weak fit</span>';
   if (verdict === 'NO_MATCH')     return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 whitespace-nowrap">❌ No fit</span>';
   if (verdict === 'DUPLICATE')    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-600 whitespace-nowrap">🔁 Duplicate</span>';
   if (verdict === 'BLACKLISTED')  return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 whitespace-nowrap">🚫 Blacklisted</span>';

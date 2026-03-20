@@ -50,7 +50,7 @@ function formatDate(iso) {
           <% if (detailVerdict === 'STRONG_MATCH') { %>
           <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">STRONG MATCH ▾</span>
           <% } else if (detailVerdict === 'WEAK_MATCH') { %>
-          <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">WEAK MATCH ▾</span>
+          <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700 border border-yellow-200">WEAK MATCH ▾</span>
           <% } else if (detailVerdict === 'NO_MATCH') { %>
           <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-600 border border-red-200">NO MATCH ▾</span>
           <% } else if (detailVerdict === 'DUPLICATE') { %>
@@ -142,10 +142,10 @@ function formatDate(iso) {
 <!-- AI Rationale -->
 <% if (job.ai_rationale) {
   const verdict = job.is_duplicate ? 'DUPLICATE' : job.ai_verdict;
-  const rBox  = verdict === 'STRONG_MATCH' ? 'bg-emerald-50 border-emerald-200' : verdict === 'WEAK_MATCH' ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200';
-  const rIcon = verdict === 'STRONG_MATCH' ? 'text-emerald-600' : verdict === 'WEAK_MATCH' ? 'text-amber-600' : 'text-red-500';
-  const rHead = verdict === 'STRONG_MATCH' ? 'text-emerald-800' : verdict === 'WEAK_MATCH' ? 'text-amber-800' : 'text-red-700';
-  const rBody = verdict === 'STRONG_MATCH' ? 'text-emerald-900' : verdict === 'WEAK_MATCH' ? 'text-amber-900' : 'text-red-800';
+  const rBox  = verdict === 'STRONG_MATCH' ? 'bg-emerald-50 border-emerald-200' : verdict === 'WEAK_MATCH' ? 'bg-yellow-50 border-yellow-200' : 'bg-red-50 border-red-200';
+  const rIcon = verdict === 'STRONG_MATCH' ? 'text-emerald-600' : verdict === 'WEAK_MATCH' ? 'text-yellow-600' : 'text-red-500';
+  const rHead = verdict === 'STRONG_MATCH' ? 'text-emerald-800' : verdict === 'WEAK_MATCH' ? 'text-yellow-800' : 'text-red-700';
+  const rBody = verdict === 'STRONG_MATCH' ? 'text-emerald-900' : verdict === 'WEAK_MATCH' ? 'text-yellow-900' : 'text-red-800';
 %>
 <div class="<%= rBox %> border rounded-xl p-5 mb-6">
   <div class="flex items-center gap-2 mb-2">

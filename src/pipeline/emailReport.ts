@@ -70,7 +70,7 @@ function buildEmailHtml(
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px;">
       ${statBadge('Fetched', stats.jobsFetched, '#6B7280')}
       ${statBadge('Strong Match', stats.strongMatch, '#059669')}
-      ${statBadge('Weak Match', stats.weakMatch, '#D97706')}
+      ${statBadge('Weak Match', stats.weakMatch, '#ca8a04')}
       ${statBadge('No Match', stats.noMatch, '#DC2626')}
       ${statBadge('Duplicates', stats.duplicates, '#7C3AED')}
     </div>

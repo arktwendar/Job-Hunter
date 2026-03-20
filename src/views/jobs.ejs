@@ -108,7 +108,7 @@ function renderTable(groups, idPrefix) {
         : 'text-xs px-2 py-0.5 rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 hover:text-gray-600 transition-colors whitespace-nowrap';
       const appliedLabel = job.applied ? '✓ Applied' : 'Applied';
       const noteEsc = escHtml(job.user_notes || '');
-      const noteClass = job.user_notes ? 'text-amber-500 hover:text-amber-600 transition-colors' : 'opacity-20 hover:opacity-50 transition-opacity text-gray-500';
+      const noteClass = job.user_notes ? 'text-yellow-500 hover:text-yellow-600 transition-colors' : 'opacity-20 hover:opacity-50 transition-opacity text-gray-500';
       const noteTitle = job.user_notes ? escHtml((job.user_notes.split('\n')[0] || '').slice(0, 60)) : 'Add note';
       const noteSvg = job.user_notes
         ? '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>'
@@ -147,7 +147,7 @@ function renderCards(groups, idPrefix) {
         : 'text-xs px-2 py-1 rounded-full border border-gray-200 text-gray-400 whitespace-nowrap';
       const appliedLabel = job.applied ? '✓ Applied' : 'Applied';
       const noteEsc = escHtml(job.user_notes || '');
-      const noteClass = job.user_notes ? 'text-amber-500' : 'opacity-20 text-gray-500';
+      const noteClass = job.user_notes ? 'text-yellow-500' : 'opacity-20 text-gray-500';
       const noteSvg = job.user_notes
         ? '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>'
         : '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>';
@@ -266,7 +266,7 @@ function updateNoteIcon(btn, note) {
   const filledSvg = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>';
   const outlineSvg = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>';
   if (note) {
-    btn.className = 'text-amber-500 hover:text-amber-600 transition-colors';
+    btn.className = 'text-yellow-500 hover:text-yellow-600 transition-colors';
     btn.title = note.split('\n')[0].slice(0, 60);
     btn.innerHTML = filledSvg;
   } else {
