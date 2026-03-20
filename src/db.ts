@@ -62,6 +62,14 @@ function wrapDatabase(raw: NodeSQLiteDatabase): Database {
 
 export const DEFAULT_DEDUP_SYSTEM_PROMPT = `You are a job posting deduplication engine. Your task is to determine whether a NEW job posting is effectively the same position as any of the EXISTING postings from the same company. Two postings are duplicates if they describe the same role even if the text has been slightly reworded, reformatted, or reposted with a new ID.`;
 
+export const DEFAULT_CV_COMPARISON_PROMPT = `analyze and answer these questions in a very brief manner so i can read it in 1 min:
+- what's the area or product this role owns?
+- does it openly say about supporting or not supporting with visa / relocation / remote work from everywhere?
+- do I have what's needed for this role, based on my CV?
+- would it be a fun new challenge?
+1-2 lines for each question
+be critical-minded, don't try to please me`;
+
 export const DEFAULT_AI_SYSTEM_PROMPT = `You are evaluating LinkedIn job postings for a senior product professional with 8+ years of experience. Assess how well each job matches this ideal profile:
 
 IDEAL CANDIDATE:
@@ -613,6 +621,29 @@ function runMigrations(db: Database): void {
     console.warn('[db] Migration v23b (original_ai_verdict re-backfill) failed (non-fatal):', (err as Error).message);
   }
 
+  // vCV: add cv_comparison_prompt to settings
+  try {
+    const cols = db.prepare(`PRAGMA table_info(settings)`).all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === 'cv_comparison_prompt')) {
+      db.exec(`ALTER TABLE settings ADD COLUMN cv_comparison_prompt TEXT NOT NULL DEFAULT ''`);
+      db.prepare(`UPDATE settings SET cv_comparison_prompt = ? WHERE cv_comparison_prompt = ''`).run(DEFAULT_CV_COMPARISON_PROMPT);
+      console.log('[db] Migration vCV: settings.cv_comparison_prompt column added');
+    }
+  } catch (err) {
+    console.warn('[db] Migration vCV (cv_comparison_prompt) failed (non-fatal):', (err as Error).message);
+  }
+
+  // vCV: add cv_assessment to jobs
+  try {
+    const cols = db.prepare(`PRAGMA table_info(jobs)`).all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === 'cv_assessment')) {
+      db.exec(`ALTER TABLE jobs ADD COLUMN cv_assessment TEXT`);
+      console.log('[db] Migration vCV: jobs.cv_assessment column added');
+    }
+  } catch (err) {
+    console.warn('[db] Migration vCV (cv_assessment) failed (non-fatal):', (err as Error).message);
+  }
+
   // v8: seed default search group from settings row if groups table is empty
   try {
     const groupCount = (
@@ -740,6 +771,16 @@ function initSchema(db: Database): void {
       UNIQUE (profile_id, company_name)
     );
 
+
+    CREATE TABLE IF NOT EXISTS cvs (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      profile_id   INTEGER NOT NULL DEFAULT 1,
+      filename     TEXT    NOT NULL,
+      mime_type    TEXT    NOT NULL DEFAULT 'application/pdf',
+      content_b64  TEXT    NOT NULL,
+      file_size    INTEGER NOT NULL,
+      uploaded_at  TEXT    NOT NULL
+    );
 
     CREATE TABLE IF NOT EXISTS settings (
       id                     INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -889,6 +930,7 @@ export interface JobRow {
   apply_url: string | null;
   provider: string;
   original_ai_verdict: string | null;
+  cv_assessment: string | null;
 }
 
 export interface SearchRunRow {
@@ -940,7 +982,18 @@ export interface SettingsRow {
   schedule_date_range: string;  // '24h' | '7d' | 'month'
   schedule_group_ids: string;   // JSON number[] | '' for all active
   scraping_provider: string;    // 'harvestapi' | 'valig'
+  cv_comparison_prompt: string;
   updated_at: string;
+}
+
+export interface CvRow {
+  id: number;
+  profile_id: number;
+  filename: string;
+  mime_type: string;
+  content_b64: string;
+  file_size: number;
+  uploaded_at: string;
 }
 
 export interface RunJobLogRow {

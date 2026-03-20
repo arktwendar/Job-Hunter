@@ -1,4 +1,20 @@
 <%
+// Minimal markdown → HTML: **bold**, line breaks into paragraphs
+function renderMd(text) {
+  if (!text) return '';
+  // Escape HTML first
+  let s = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  // **bold**
+  s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // Split by blank lines into paragraphs, treat single newlines as <br>
+  const paras = s.split(/\n{2,}/);
+  return paras.map(p => '<p>' + p.replace(/\n/g, '<br>') + '</p>').join('');
+}
+%>
+<%
 function scoreTextColor(score) {
   if (score >= 85) return 'text-emerald-700 bg-emerald-50 border-emerald-200';
   if (score >= 71) return 'text-emerald-600 bg-emerald-50 border-emerald-200';
@@ -120,6 +136,12 @@ function formatDate(iso) {
         Mark as Applied
       </button>
       <% } %>
+      <!-- Compare to CV -->
+      <button id="cv-compare-btn" onclick="openCvModal()"
+              class="w-full inline-flex items-center justify-center gap-2 text-sm font-medium px-4 py-2 rounded-lg border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        Compare to CV
+      </button>
     </div>
   </div>
 </div>
@@ -139,6 +161,37 @@ function formatDate(iso) {
   <p id="notes-status" class="text-xs text-gray-400 mt-1.5 hidden"></p>
 </div>
 
+<!-- Assessment against CV -->
+<style>
+  .cv-md { font-size: 0.875rem; line-height: 1.65; color: #1e3a5f; }
+  .cv-md p { margin-top: 0.75em; margin-bottom: 0; }
+  .cv-md p:first-child { margin-top: 0; }
+  .cv-md strong { font-weight: 600; }
+</style>
+<% if (job.cv_assessment) { %>
+<div id="cv-assessment-block" class="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-6">
+  <div class="flex items-center justify-between mb-3">
+    <div class="flex items-center gap-2">
+      <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+      <span class="text-sm font-semibold text-blue-800">In-Depth AI Assessment</span>
+    </div>
+    <button onclick="openCvModal()" class="text-xs text-blue-600 hover:text-blue-800 hover:underline">Re-run</button>
+  </div>
+  <div id="cv-assessment-text" class="cv-md"><%- renderMd(job.cv_assessment) %></div>
+</div>
+<% } else { %>
+<div id="cv-assessment-block" class="hidden bg-blue-50 border border-blue-200 rounded-xl p-5 mb-6">
+  <div class="flex items-center justify-between mb-3">
+    <div class="flex items-center gap-2">
+      <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+      <span class="text-sm font-semibold text-blue-800">In-Depth AI Assessment</span>
+    </div>
+    <button onclick="openCvModal()" class="text-xs text-blue-600 hover:text-blue-800 hover:underline">Re-run</button>
+  </div>
+  <div id="cv-assessment-text" class="cv-md"></div>
+</div>
+<% } %>
+
 <!-- AI Rationale -->
 <% if (job.ai_rationale) {
   const verdict = job.is_duplicate ? 'DUPLICATE' : job.ai_verdict;
@@ -150,7 +203,7 @@ function formatDate(iso) {
 <div class="<%= rBox %> border rounded-xl p-5 mb-6">
   <div class="flex items-center gap-2 mb-2">
     <svg class="w-4 h-4 <%= rIcon %>" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
-    <span class="text-sm font-semibold <%= rHead %>">AI Analysis</span>
+    <span class="text-sm font-semibold <%= rHead %>">General AI Analysis</span>
   </div>
   <p class="text-sm <%= rBody %> leading-relaxed"><%= job.ai_rationale %></p>
 </div>
@@ -251,6 +304,45 @@ const _safeDesc = _isHtml
   <% } %>
 </div>
 
+<!-- CV Selection Modal -->
+<div id="cv-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeCvModal()"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md">
+    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <h2 class="font-semibold text-gray-900">Compare to CV</h2>
+      <button onclick="closeCvModal()" class="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="px-6 py-5">
+      <% if (cvs && cvs.length > 0) { %>
+      <p class="text-sm text-gray-600 mb-4">Select a CV to compare against this job:</p>
+      <div class="space-y-2 mb-5">
+        <% cvs.forEach(function(cv, i) { %>
+        <label class="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors has-[:checked]:border-blue-400 has-[:checked]:bg-blue-50">
+          <input type="radio" name="cv_selection" value="<%= cv.id %>" <%= i === 0 ? 'checked' : '' %>
+                 class="text-blue-600 focus:ring-blue-500" />
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-gray-800 truncate"><%= cv.filename %></p>
+            <p class="text-xs text-gray-400"><%= (cv.file_size / 1024).toFixed(0) %> KB · <%= new Date(cv.uploaded_at).toLocaleDateString('en-GB') %></p>
+          </div>
+        </label>
+        <% }); %>
+      </div>
+      <div id="cv-modal-error" class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3"></div>
+      <button onclick="runCvCompare()"
+              class="w-full inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        <span id="cv-run-label">Analyse</span>
+      </button>
+      <% } else { %>
+      <p class="text-sm text-gray-500 mb-4">No CVs uploaded yet. Go to <a href="/settings" class="text-blue-600 hover:underline">Settings</a> to upload a CV first.</p>
+      <button onclick="closeCvModal()" class="w-full text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg transition-colors">Close</button>
+      <% } %>
+    </div>
+  </div>
+</div>
+
 <script>
 const _jobId = <%= job.id %>;
 
@@ -277,6 +369,62 @@ async function toggleApplied() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ applied: _applied }),
   }).catch(() => {});
+}
+
+function renderMdJs(text) {
+  if (!text) return '';
+  let s = text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  return text.split(/\n{2,}/).map(function(p) {
+    let escaped = p.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    escaped = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    return '<p>' + escaped.replace(/\n/g, '<br>') + '</p>';
+  }).join('');
+}
+
+function openCvModal() {
+  document.getElementById('cv-modal').classList.remove('hidden');
+  document.getElementById('cv-modal-error')?.classList.add('hidden');
+}
+
+function closeCvModal() {
+  document.getElementById('cv-modal').classList.add('hidden');
+}
+
+async function runCvCompare() {
+  const selected = document.querySelector('input[name="cv_selection"]:checked');
+  if (!selected) return;
+  const cvId = selected.value;
+
+  const label = document.getElementById('cv-run-label');
+  const errEl = document.getElementById('cv-modal-error');
+  label.textContent = 'Analysing…';
+
+  try {
+    const res = await fetch('/api/jobs/' + _jobId + '/cv-compare', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cv_id: parseInt(cvId, 10) }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      const block = document.getElementById('cv-assessment-block');
+      const text = document.getElementById('cv-assessment-text');
+      text.innerHTML = renderMdJs(data.assessment);
+      block.classList.remove('hidden');
+      closeCvModal();
+      block.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      errEl.textContent = data.error || 'Analysis failed';
+      errEl.classList.remove('hidden');
+    }
+  } catch {
+    errEl.textContent = 'Network error — please try again';
+    errEl.classList.remove('hidden');
+  } finally {
+    label.textContent = 'Analyse';
+  }
 }
 
 async function saveNotes() {

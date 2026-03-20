@@ -49,6 +49,54 @@
     </div>
   </div>
 
+  <!-- ==================== CVs ==================== -->
+  <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h2 class="text-base font-semibold text-gray-900">CVs</h2>
+        <p class="text-xs text-gray-500 mt-0.5">Upload your CVs to use for job comparison. PDF, TXT, and MD files supported.</p>
+      </div>
+    </div>
+
+    <!-- CV List -->
+    <% if (cvs && cvs.length > 0) { %>
+    <div class="space-y-2 mb-4">
+      <% cvs.forEach(function(cv) { %>
+      <div class="flex items-center justify-between gap-3 px-3 py-2.5 bg-gray-50 rounded-lg border border-gray-200" data-cv-id="<%= cv.id %>">
+        <div class="flex items-center gap-2 min-w-0">
+          <% if (cv.mime_type === 'application/pdf') { %>
+          <svg class="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          <% } else { %>
+          <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          <% } %>
+          <span class="text-sm text-gray-800 truncate"><%= cv.filename %></span>
+          <span class="text-xs text-gray-400 flex-shrink-0"><%= (cv.file_size / 1024).toFixed(0) %> KB</span>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <a href="/settings/cvs/<%= cv.id %>/view" target="_blank"
+             class="text-xs text-blue-600 hover:text-blue-800 hover:underline">Open</a>
+          <button type="button" onclick="deleteCV(<%= cv.id %>, this)"
+                  class="text-xs text-red-500 hover:text-red-700 hover:underline">Delete</button>
+        </div>
+      </div>
+      <% }); %>
+    </div>
+    <% } else { %>
+    <p class="text-sm text-gray-400 mb-4">No CVs uploaded yet.</p>
+    <% } %>
+
+    <!-- Upload form -->
+    <form method="post" action="/settings/cvs/upload" enctype="multipart/form-data" class="flex items-center gap-3">
+      <input type="file" name="cv_file" accept=".pdf,.txt,.md" onchange="toggleUploadBtn(this)"
+             class="block text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-gray-200 file:text-xs file:font-medium file:bg-gray-50 file:text-gray-700 hover:file:bg-gray-100 cursor-pointer" />
+      <button type="submit" id="cv-upload-btn"
+              class="hidden flex-shrink-0 inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-lg transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        Upload
+      </button>
+    </form>
+  </div>
+
   <!-- ==================== BLACKLISTED COMPANIES (compact) ==================== -->
   <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
     <div class="flex items-center justify-between mb-3">
@@ -71,43 +119,19 @@
   <!-- ==================== GLOBAL SETTINGS FORM ==================== -->
   <form method="post" action="/settings" class="space-y-6">
 
-    <!-- AI SETTINGS — collapsible -->
+    <!-- SCORING & SUMMARY AI PROMPT -->
     <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-      <button type="button" onclick="toggleAiSettings()"
+      <button type="button" onclick="togglePromptBlock('scoring-prompt-body', 'scoring-prompt-chevron')"
               class="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-gray-50 transition-colors">
         <div>
-          <h2 class="text-base font-semibold text-gray-900">AI Settings</h2>
-          <p class="text-xs text-gray-500 mt-0.5">Model and prompts. Edit editable parts — fixed parts are shown for context only.</p>
+          <h2 class="text-base font-semibold text-gray-900">Scoring &amp; Summary AI Prompt</h2>
+          <p class="text-xs text-gray-500 mt-0.5">One call per new job — rates it 0–100, assigns a verdict + rationale, and generates a summary for Strong Matches.</p>
         </div>
-        <svg id="ai-chevron" class="w-4 h-4 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg id="scoring-prompt-chevron" class="w-4 h-4 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
         </svg>
       </button>
-      <div id="ai-settings-body" class="hidden border-t border-gray-100 px-6 pt-5 pb-6 space-y-6">
-
-        <!-- Model -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Model</label>
-          <select name="ai_model" class="w-full sm:w-72 rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500">
-            <option value="gpt-5-mini" <%= settings.ai_model === 'gpt-5-mini' ? 'selected' : '' %>>gpt-5-mini (fast, cost-efficient)</option>
-            <option value="gpt-5.4" <%= settings.ai_model === 'gpt-5.4' ? 'selected' : '' %>>gpt-5.4 (highest accuracy)</option>
-          </select>
-          <p class="text-xs text-gray-400 mt-1.5">Applies to both AI calls below.</p>
-        </div>
-
-        <div class="border-t border-gray-100"></div>
-
-        <!-- ── CALL 1: SCORING + SUMMARY ── -->
-        <div>
-          <div class="flex items-start gap-3 mb-4">
-            <span class="mt-0.5 inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-bold flex-shrink-0">1</span>
-            <div>
-              <p class="text-sm font-semibold text-gray-800">Scoring &amp; Summary</p>
-              <p class="text-xs text-gray-500 mt-0.5">One call per new job — rates it 0–100, assigns a verdict + rationale, and generates a summary for Strong Matches.</p>
-            </div>
-          </div>
-
-          <div class="space-y-3">
+      <div id="scoring-prompt-body" class="hidden border-t border-gray-100 px-6 pt-5 pb-6 space-y-3">
 
             <!-- System prompt: single template view -->
             <div>
@@ -213,22 +237,22 @@ For summary: if score is >70 —</pre>
 }</pre>
             </div>
 
-          </div>
-        </div>
+      </div>
+    </div>
 
-        <div class="border-t border-gray-100"></div>
-
-        <!-- ── CALL 2: DEDUP CHECK ── -->
+    <!-- DUPLICATE CHECK AI PROMPT -->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <button type="button" onclick="togglePromptBlock('dedup-prompt-body', 'dedup-prompt-chevron')"
+              class="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-gray-50 transition-colors">
         <div>
-          <div class="flex items-start gap-3 mb-4">
-            <span class="mt-0.5 inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-bold flex-shrink-0">2</span>
-            <div>
-              <p class="text-sm font-semibold text-gray-800">Duplicate Check</p>
-              <p class="text-xs text-gray-500 mt-0.5">Only runs for Strong Matches when the same company + title already exists in the DB — detects if the job is a repost. Skipped entirely for first-time postings.</p>
-            </div>
-          </div>
-
-          <div>
+          <h2 class="text-base font-semibold text-gray-900">Duplicate Check AI Prompt</h2>
+          <p class="text-xs text-gray-500 mt-0.5">Only runs for Strong Matches when the same company + title already exists in the DB — detects if the job is a repost.</p>
+        </div>
+        <svg id="dedup-prompt-chevron" class="w-4 h-4 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </button>
+      <div id="dedup-prompt-body" class="hidden border-t border-gray-100 px-6 pt-5 pb-6 space-y-3">
             <p class="text-xs font-medium text-gray-600 mb-2">System prompt <span class="text-gray-400 font-normal">— parts assembled in order:</span></p>
 
             <div class="space-y-1.5">
@@ -286,9 +310,28 @@ Description: {description — up to 1,500 chars each}
               </div>
 
             </div>
-          </div>
-        </div>
+      </div>
+    </div>
 
+    <!-- CV COMPARISON AI PROMPT -->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <button type="button" onclick="togglePromptBlock('cv-prompt-body', 'cv-prompt-chevron')"
+              class="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-gray-50 transition-colors">
+        <div>
+          <h2 class="text-base font-semibold text-gray-900">CV Comparison AI Prompt</h2>
+          <p class="text-xs text-gray-500 mt-0.5">On-demand — triggered manually from a job detail page. Compares your CV against the job description and answers your questions.</p>
+        </div>
+        <svg id="cv-prompt-chevron" class="w-4 h-4 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </button>
+      <div id="cv-prompt-body" class="hidden border-t border-gray-100 px-6 pt-5 pb-6">
+            <div class="flex items-center gap-2 mb-1.5">
+              <span class="text-[10px] font-semibold uppercase tracking-wider text-blue-600 bg-blue-50 rounded px-1.5 py-0.5">Editable</span>
+              <span class="text-xs text-gray-500">Prompt sent along with your CV and the job description</span>
+            </div>
+            <textarea name="cv_comparison_prompt" rows="7"
+                      class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"><%= settings.cv_comparison_prompt %></textarea>
       </div>
     </div>
 
@@ -360,6 +403,14 @@ Description: {description — up to 1,500 chars each}
             </button>
           </div>
           <p id="openai-test-status" class="text-xs mt-1.5 hidden"></p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">Model <span class="font-normal text-gray-400">(applies to all AI calls)</span></label>
+          <select name="ai_model" class="w-full sm:w-72 rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500">
+            <option value="gpt-5-mini" <%= settings.ai_model === 'gpt-5-mini' ? 'selected' : '' %>>gpt-5-mini (fast, cost-efficient)</option>
+            <option value="gpt-5.4" <%= settings.ai_model === 'gpt-5.4' ? 'selected' : '' %>>gpt-5.4 (highest accuracy)</option>
+          </select>
         </div>
 
       </div>
@@ -832,12 +883,12 @@ function toggleCollapsible(bodyId, chevronId) {
   chevron.style.transform = nowHidden ? '' : 'rotate(90deg)';
 }
 
-function toggleAiSettings() {
-  const body = document.getElementById('ai-settings-body');
-  const chevron = document.getElementById('ai-chevron');
+function togglePromptBlock(bodyId, chevronId) {
+  const body = document.getElementById(bodyId);
+  const chevron = document.getElementById(chevronId);
   const isHidden = body.classList.contains('hidden');
   body.classList.toggle('hidden', !isHidden);
-  chevron.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+  chevron.style.transform = isHidden ? 'rotate(180deg)' : '';
 }
 
 // ---- Groups state ----
@@ -1393,6 +1444,35 @@ document.addEventListener('keydown', e => {
     closeBlacklistMgmtModal();
   }
 });
+
+// Show upload button only when a file is chosen
+function toggleUploadBtn(input) {
+  const btn = document.getElementById('cv-upload-btn');
+  if (btn) btn.classList.toggle('hidden', !input.files || input.files.length === 0);
+}
+
+// CV delete
+async function deleteCV(cvId, btn) {
+  if (!confirm('Delete this CV?')) return;
+  btn.textContent = '…';
+  btn.disabled = true;
+  try {
+    const res = await fetch('/settings/cvs/' + cvId, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.ok) {
+      const row = btn.closest('[data-cv-id]');
+      if (row) row.remove();
+    } else {
+      alert(data.error || 'Failed to delete CV');
+      btn.textContent = 'Delete';
+      btn.disabled = false;
+    }
+  } catch {
+    alert('Network error');
+    btn.textContent = 'Delete';
+    btn.disabled = false;
+  }
+}
 
 // Initial load
 loadGroups();

@@ -3,7 +3,7 @@
  */
 
 import { Router, type Request, type Response } from 'express';
-import { getDb, type JobRow, type SearchRunRow, type SearchGroupRow, type SettingsRow } from '../db';
+import { getDb, type JobRow, type SearchRunRow, type SearchGroupRow, type SettingsRow, type CvRow } from '../db';
 
 const router = Router();
 
@@ -235,7 +235,10 @@ router.get('/job/:id', (req: Request, res: Response) => {
     }
   }
 
-  res.render('job-detail', { job, original, duplicatesOfThis, title: job.title, backUrl, backLabel, prevId, nextId, from });
+  const settings = db.prepare('SELECT * FROM settings WHERE profile_id = ?').get(profileId) as SettingsRow | undefined;
+  const cvs = db.prepare('SELECT id, filename, mime_type, file_size, uploaded_at FROM cvs WHERE profile_id = ? ORDER BY uploaded_at DESC').all(profileId) as Omit<CvRow, 'content_b64'>[];
+
+  res.render('job-detail', { job, original, duplicatesOfThis, title: job.title, backUrl, backLabel, prevId, nextId, from, cvs, settings });
 });
 
 export { router as dashboardRouter };

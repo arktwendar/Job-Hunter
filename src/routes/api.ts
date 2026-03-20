@@ -8,9 +8,10 @@ import type { DateRange } from '../pipeline/fetcher';
 import { sendTestEmail } from '../pipeline/emailReport';
 import { fetchJobs } from '../pipeline/fetcher';
 import { startSchedule, stopSchedule, getScheduleStatus } from '../pipeline/scheduler';
-import { getDb, type SettingsRow, type SearchGroupRow, type BlacklistedCompanyRow, type RunJobLogRow } from '../db';
+import { getDb, type SettingsRow, type SearchGroupRow, type BlacklistedCompanyRow, type RunJobLogRow, type JobRow, type CvRow, DEFAULT_CV_COMPARISON_PROMPT } from '../db';
 import { config } from '../config';
 import { checkOpenAiBalance } from '../utils/openaiBalance';
+import OpenAI from 'openai';
 
 const router = Router();
 
@@ -762,5 +763,80 @@ router.delete('/blacklist/:id', (req: Request, res: Response) => {
   res.json({ success: true });
 });
 
+
+// POST /api/jobs/:id/cv-compare — compare job to a saved CV using OpenAI
+router.post('/jobs/:id/cv-compare', async (req: Request, res: Response) => {
+  const db = getDb();
+  const profileId = req.profile.id;
+  const jobId = parseInt(req.params.id, 10);
+  if (isNaN(jobId)) { res.status(400).json({ error: 'Invalid job id.' }); return; }
+
+  const body = req.body as Record<string, unknown>;
+  const cvId = parseInt(String(body.cv_id || '0'), 10);
+  if (!cvId || isNaN(cvId)) { res.status(400).json({ error: 'cv_id is required.' }); return; }
+
+  const job = db.prepare('SELECT * FROM jobs WHERE id = ? AND profile_id = ?').get(jobId, profileId) as JobRow | undefined;
+  if (!job) { res.status(404).json({ error: 'Job not found.' }); return; }
+
+  const cv = db.prepare('SELECT * FROM cvs WHERE id = ? AND profile_id = ?').get(cvId, profileId) as CvRow | undefined;
+  if (!cv) { res.status(404).json({ error: 'CV not found.' }); return; }
+
+  const settings = db.prepare('SELECT * FROM settings WHERE profile_id = ?').get(profileId) as SettingsRow;
+  const openaiKey = settings?.openai_api_key?.trim() || config.openAiKey?.trim();
+  if (!openaiKey) { res.status(400).json({ error: 'OpenAI API key not configured.' }); return; }
+
+  const prompt = settings?.cv_comparison_prompt?.trim() || DEFAULT_CV_COMPARISON_PROMPT;
+  const model = settings?.ai_model || 'gpt-5.4';
+  const jobText = `JOB TITLE: ${job.title}\nCOMPANY: ${job.company}\nLOCATION: ${job.location || 'N/A'}\nWORK MODE: ${job.work_mode || 'N/A'}\n\nDESCRIPTION:\n${(job.description || '').substring(0, 12000)}`;
+
+  try {
+    const client = new OpenAI({ apiKey: openaiKey });
+    let responseText: string;
+
+    if (cv.mime_type === 'application/pdf') {
+      // PDF: send as base64 file input
+      const response = await client.responses.create({
+        model,
+        input: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'input_file' as const,
+                filename: cv.filename,
+                file_data: `data:application/pdf;base64,${cv.content_b64}`,
+              },
+              {
+                type: 'input_text' as const,
+                text: `\nHere is the job description:\n\n${jobText}\n\n${prompt}`,
+              },
+            ],
+          },
+        ],
+      });
+      responseText = response.output_text;
+    } else {
+      // Text-based CV
+      const cvText = Buffer.from(cv.content_b64, 'base64').toString('utf-8');
+      const response = await client.responses.create({
+        model,
+        input: [
+          {
+            role: 'user',
+            content: `MY CV:\n\n${cvText}\n\nJOB POSTING:\n\n${jobText}\n\n${prompt}`,
+          },
+        ],
+      });
+      responseText = response.output_text;
+    }
+
+    if (!responseText) throw new Error('Empty response from OpenAI');
+
+    db.prepare('UPDATE jobs SET cv_assessment = ? WHERE id = ?').run(responseText, jobId);
+    res.json({ ok: true, assessment: responseText });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
 
 export { router as apiRouter };
