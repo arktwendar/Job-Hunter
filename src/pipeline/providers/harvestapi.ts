@@ -113,7 +113,7 @@ export async function fetchWithHarvestApi(
     locations: filters.locations,
     postedLimit: getPostedLimit(dateRange),
     sortBy: 'date',
-    maxItems: 100,
+    maxItems: 1000,
     ...(workplaceType.length > 0 && { workplaceType }),
   };
 
