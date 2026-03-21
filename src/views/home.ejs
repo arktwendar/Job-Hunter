@@ -6,7 +6,10 @@ function scoreTextColor(score) {
 }
 function formatDate(iso) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
+  const d = new Date(iso);
+  const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  return `${date} ${time}`;
 }
 function statusColor(s) {
   if (s === 'success') return 'text-emerald-700 bg-emerald-50';
@@ -217,13 +220,13 @@ function verdictChip(verdict) {
               <p class="text-xs text-gray-400 mt-0.5 truncate"><%= job.company %><% if (job.location) { %> · <%= job.location %><% } %></p>
             </div>
             <div class="flex items-center gap-2 flex-shrink-0">
-              <button class="verdict-btn" data-job-id="<%= job.id %>" data-verdict="<%= job.is_duplicate ? 'DUPLICATE' : job.ai_verdict %>" data-chip-style="compact"><%- verdictChip(job.is_duplicate ? 'DUPLICATE' : job.ai_verdict) %></button>
               <button onclick="quickToggleApplied(event,<%= job.id %>,this)"
                       data-applied="<%= job.applied ? '1' : '0' %>"
                       class="<%= job.applied ? 'text-xs px-2 py-0.5 rounded-full bg-emerald-500 text-white border border-emerald-500 hover:bg-emerald-600 transition-colors whitespace-nowrap' : 'text-xs px-2 py-0.5 rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 hover:text-gray-600 transition-colors whitespace-nowrap' %>"
                       style="width:70px;text-align:center;">
                 <%= job.applied ? '✓ Applied' : 'Applied' %>
               </button>
+              <button class="verdict-btn" data-job-id="<%= job.id %>" data-verdict="<%= job.is_duplicate ? 'DUPLICATE' : job.ai_verdict %>" data-chip-style="compact"><%- verdictChip(job.is_duplicate ? 'DUPLICATE' : job.ai_verdict) %></button>
               <span class="inline-block font-bold text-xs score-badge <%= scoreTextColor(job.ai_score) %> px-2 py-0.5 rounded">
                 <%= job.ai_score %>%
               </span>

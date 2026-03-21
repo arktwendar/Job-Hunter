@@ -22,7 +22,10 @@ function scoreTextColor(score) {
 }
 function formatDate(iso) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
+  const d = new Date(iso);
+  const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  return `${date} ${time}`;
 }
 %>
 
