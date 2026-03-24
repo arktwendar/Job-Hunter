@@ -20,11 +20,12 @@ function scoreTextColor(score) {
   if (score >= 71) return 'text-emerald-600 bg-emerald-50 border-emerald-200';
   return 'text-gray-600 bg-gray-100 border-gray-200';
 }
+const tz = (settings && settings.timezone) || 'UTC';
 function formatDate(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
-  const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: tz });
+  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: tz });
   return `${date} ${time}`;
 }
 %>

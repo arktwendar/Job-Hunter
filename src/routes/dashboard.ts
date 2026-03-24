@@ -24,9 +24,10 @@ router.get('/', (req: Request, res: Response) => {
     ? (db.prepare(`
         SELECT
           SUM(CASE WHEN ai_verdict = 'STRONG_MATCH' AND is_duplicate = 0 THEN 1 ELSE 0 END) as strong,
+          SUM(CASE WHEN ai_verdict = 'WEAK_MATCH'   AND is_duplicate = 0 THEN 1 ELSE 0 END) as weak,
           SUM(CASE WHEN is_duplicate = 1 THEN 1 ELSE 0 END) as duplicate
         FROM jobs WHERE profile_id = ? AND fetched_at >= ?
-      `).get(profileId, lastRunAt) as { strong: number; duplicate: number } | undefined)
+      `).get(profileId, lastRunAt) as { strong: number; weak: number; duplicate: number } | undefined)
     : undefined;
 
   const lastRunJobs = lastRunAt
@@ -86,8 +87,8 @@ router.get('/', (req: Request, res: Response) => {
 
   res.render('home', {
     lastRun,
-    liveStrong:    liveLastRunStats?.strong    ?? lastRun?.jobs_strong_match ?? 0,
-    liveDuplicate: liveLastRunStats?.duplicate ?? lastRun?.jobs_duplicate    ?? 0,
+    liveStrong: liveLastRunStats?.strong ?? lastRun?.jobs_strong_match ?? 0,
+    liveWeak:   liveLastRunStats?.weak   ?? lastRun?.jobs_weak_match   ?? 0,
     lastRunJobs,
     newCount: newCount.c,
     seenCount: seenCount.c,
@@ -96,6 +97,7 @@ router.get('/', (req: Request, res: Response) => {
     appliedCount,
     checklist,
     checklistDone,
+    timezone: settings?.timezone || 'UTC',
     title: 'Start',
   });
 });
@@ -168,6 +170,7 @@ router.get('/history', (req: Request, res: Response) => {
 
   const totalPages = Math.ceil(total / limit);
   const groups = db.prepare('SELECT id, group_name FROM search_groups WHERE profile_id = ? ORDER BY id ASC').all(profileId) as Pick<SearchGroupRow, 'id' | 'group_name'>[];
+  const histSettings = db.prepare('SELECT timezone FROM settings WHERE profile_id = ?').get(profileId) as Pick<SettingsRow, 'timezone'> | undefined;
 
   res.render('history', {
     jobs,
@@ -176,6 +179,7 @@ router.get('/history', (req: Request, res: Response) => {
     total,
     groups,
     filters: { verdict, company, scoreMin, scoreMax, dateFrom, dateTo, groupId },
+    timezone: histSettings?.timezone || 'UTC',
     title: 'Jobs All',
   });
 });

@@ -1,12 +1,11 @@
 <%
+const tz = timezone || 'UTC';
 function fmtDate(iso) {
   if (!iso) return { date: '—', time: '' };
   const d = new Date(String(iso));
   if (isNaN(d.getTime())) return { date: String(iso).slice(0, 10), time: '' };
-  const offset = 4 * 60; // GMT+4 in minutes
-  const local = new Date(d.getTime() + offset * 60_000);
-  const date = local.toISOString().slice(0, 10);
-  const time = local.toISOString().slice(11, 16);
+  const date = d.toLocaleDateString('en-CA', { timeZone: tz });
+  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: tz });
   return { date, time };
 }
 

@@ -493,6 +493,50 @@ Description: {description — up to 1,500 chars each}
       </div>
     </div>
 
+    <!-- TIMEZONE -->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+      <h2 class="text-base font-semibold text-gray-900 mb-1">Timezone</h2>
+      <p class="text-xs text-gray-500 mb-4">Used for all timestamps — logs, run times, and scheduled runs</p>
+      <select name="timezone" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+        <option value="UTC"                               <%= settings.timezone === 'UTC'                               ? 'selected' : '' %>>GMT+0 (UTC)</option>
+        <option value="Europe/London"                     <%= settings.timezone === 'Europe/London'                     ? 'selected' : '' %>>GMT+0 (London)</option>
+        <option value="Africa/Lagos"                      <%= settings.timezone === 'Africa/Lagos'                      ? 'selected' : '' %>>GMT+1 (Lagos)</option>
+        <option value="Europe/Paris"                      <%= settings.timezone === 'Europe/Paris'                      ? 'selected' : '' %>>GMT+1 (Paris)</option>
+        <option value="Africa/Cairo"                      <%= settings.timezone === 'Africa/Cairo'                      ? 'selected' : '' %>>GMT+2 (Cairo)</option>
+        <option value="Africa/Johannesburg"               <%= settings.timezone === 'Africa/Johannesburg'               ? 'selected' : '' %>>GMT+2 (Johannesburg)</option>
+        <option value="Asia/Kuwait"                       <%= settings.timezone === 'Asia/Kuwait'                       ? 'selected' : '' %>>GMT+3 (Kuwait)</option>
+        <option value="Asia/Riyadh"                       <%= settings.timezone === 'Asia/Riyadh'                       ? 'selected' : '' %>>GMT+3 (Riyadh)</option>
+        <option value="Europe/Istanbul"                   <%= settings.timezone === 'Europe/Istanbul'                   ? 'selected' : '' %>>GMT+3 (Istanbul)</option>
+        <option value="Europe/Moscow"                     <%= settings.timezone === 'Europe/Moscow'                     ? 'selected' : '' %>>GMT+3 (Moscow)</option>
+        <option value="Asia/Dubai"                        <%= settings.timezone === 'Asia/Dubai'                        ? 'selected' : '' %>>GMT+4 (Dubai)</option>
+        <option value="Asia/Yerevan"                      <%= settings.timezone === 'Asia/Yerevan'                      ? 'selected' : '' %>>GMT+4 (Yerevan)</option>
+        <option value="Asia/Karachi"                      <%= settings.timezone === 'Asia/Karachi'                      ? 'selected' : '' %>>GMT+5 (Karachi)</option>
+        <option value="Asia/Kolkata"                      <%= settings.timezone === 'Asia/Kolkata'                      ? 'selected' : '' %>>GMT+5:30 (Mumbai)</option>
+        <option value="Asia/Dhaka"                        <%= settings.timezone === 'Asia/Dhaka'                        ? 'selected' : '' %>>GMT+6 (Dhaka)</option>
+        <option value="Asia/Bangkok"                      <%= settings.timezone === 'Asia/Bangkok'                      ? 'selected' : '' %>>GMT+7 (Bangkok)</option>
+        <option value="Asia/Shanghai"                     <%= settings.timezone === 'Asia/Shanghai'                     ? 'selected' : '' %>>GMT+8 (Shanghai)</option>
+        <option value="Asia/Singapore"                    <%= settings.timezone === 'Asia/Singapore'                    ? 'selected' : '' %>>GMT+8 (Singapore)</option>
+        <option value="Asia/Seoul"                        <%= settings.timezone === 'Asia/Seoul'                        ? 'selected' : '' %>>GMT+9 (Seoul)</option>
+        <option value="Asia/Tokyo"                        <%= settings.timezone === 'Asia/Tokyo'                        ? 'selected' : '' %>>GMT+9 (Tokyo)</option>
+        <option value="Australia/Sydney"                  <%= settings.timezone === 'Australia/Sydney'                  ? 'selected' : '' %>>GMT+10 (Sydney)</option>
+        <option value="Pacific/Noumea"                    <%= settings.timezone === 'Pacific/Noumea'                    ? 'selected' : '' %>>GMT+11 (Noumea)</option>
+        <option value="Pacific/Auckland"                  <%= settings.timezone === 'Pacific/Auckland'                  ? 'selected' : '' %>>GMT+12 (Auckland)</option>
+        <option value="Pacific/Apia"                      <%= settings.timezone === 'Pacific/Apia'                      ? 'selected' : '' %>>GMT+13 (Apia)</option>
+        <option value="Atlantic/Azores"                   <%= settings.timezone === 'Atlantic/Azores'                   ? 'selected' : '' %>>GMT-1 (Azores)</option>
+        <option value="America/Noronha"                   <%= settings.timezone === 'America/Noronha'                   ? 'selected' : '' %>>GMT-2 (Noronha)</option>
+        <option value="America/Argentina/Buenos_Aires"    <%= settings.timezone === 'America/Argentina/Buenos_Aires'    ? 'selected' : '' %>>GMT-3 (Buenos Aires)</option>
+        <option value="America/Sao_Paulo"                 <%= settings.timezone === 'America/Sao_Paulo'                 ? 'selected' : '' %>>GMT-3 (São Paulo)</option>
+        <option value="America/Halifax"                   <%= settings.timezone === 'America/Halifax'                   ? 'selected' : '' %>>GMT-4 (Halifax)</option>
+        <option value="America/New_York"                  <%= settings.timezone === 'America/New_York'                  ? 'selected' : '' %>>GMT-5 (New York)</option>
+        <option value="America/Chicago"                   <%= settings.timezone === 'America/Chicago'                   ? 'selected' : '' %>>GMT-6 (Chicago)</option>
+        <option value="America/Denver"                    <%= settings.timezone === 'America/Denver'                    ? 'selected' : '' %>>GMT-7 (Denver)</option>
+        <option value="America/Los_Angeles"               <%= settings.timezone === 'America/Los_Angeles'               ? 'selected' : '' %>>GMT-8 (Los Angeles)</option>
+        <option value="America/Anchorage"                 <%= settings.timezone === 'America/Anchorage'                 ? 'selected' : '' %>>GMT-9 (Anchorage)</option>
+        <option value="Pacific/Honolulu"                  <%= settings.timezone === 'Pacific/Honolulu'                  ? 'selected' : '' %>>GMT-10 (Honolulu)</option>
+        <option value="Pacific/Pago_Pago"                 <%= settings.timezone === 'Pacific/Pago_Pago'                 ? 'selected' : '' %>>GMT-11 (Pago Pago)</option>
+      </select>
+    </div>
+
     <!-- Save button -->
     <div class="flex items-center gap-4 flex-wrap">
       <button type="submit" id="save-settings-btn" disabled

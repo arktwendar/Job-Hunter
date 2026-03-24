@@ -63,6 +63,7 @@ router.post('/', (req: Request, res: Response) => {
         email_from = ?,
         email_enabled = ?,
         scraping_provider = ?,
+        timezone = ?,
         updated_at = ?
       WHERE profile_id = ?
     `).run(
@@ -77,6 +78,7 @@ router.post('/', (req: Request, res: Response) => {
       String(body.email_from || ''),
       (body.email_enabled === 'on' || body.email_enabled === '1') ? 1 : 0,
       validProviders.includes(provider) ? provider : 'harvestapi',
+      String(body.timezone || 'UTC'),
       new Date().toISOString(),
       profileId,
     );

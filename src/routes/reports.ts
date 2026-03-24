@@ -3,7 +3,7 @@
  */
 
 import { Router, type Request, type Response } from 'express';
-import { getDb, type SearchRunRow, type RunJobLogRow } from '../db';
+import { getDb, type SearchRunRow, type RunJobLogRow, type SettingsRow } from '../db';
 
 const router = Router();
 
@@ -88,7 +88,8 @@ router.get('/', (req: Request, res: Response) => {
     return { ...run, countryGroups, blacklistedCount, filteredCount };
   });
 
-  res.render('reports', { runs: runsWithLogs, title: 'Run Logs' });
+  const rSettings = db.prepare('SELECT timezone FROM settings WHERE profile_id = ?').get(req.profile.id) as Pick<SettingsRow, 'timezone'> | undefined;
+  res.render('reports', { runs: runsWithLogs, timezone: rSettings?.timezone || 'UTC', title: 'Run Logs' });
 });
 
 export { router as reportsRouter };
