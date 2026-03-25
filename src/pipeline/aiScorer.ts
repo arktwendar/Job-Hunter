@@ -114,6 +114,11 @@ export function buildScoringSystemPrompt(group: SearchGroupRow, _settings?: Sett
     parts.push('', 'Preferred industries:', '', group.industries_list);
   }
 
+  const locationList = JSON.parse(group.locations) as string[];
+  if (locationList.length > 0) {
+    parts.push('', 'Preferred locations:', '', locationList.join(', '));
+  }
+
   if (group.other_expectations?.trim()) {
     parts.push('', group.other_expectations);
   }

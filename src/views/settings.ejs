@@ -154,6 +154,10 @@ Preferred industries:
 
 <span class="text-purple-500">{industries_list}</span>
 
+Preferred locations:
+
+<span class="text-purple-500">{locations}</span>
+
 <span class="text-purple-500">{other_expectations}</span>
 
 Assess how well the job matches the profile and expectations.
@@ -1184,6 +1188,8 @@ function updatePromptPreview() {
   const desiredRoles = titleFilter || keywords || '(none)';
   const profile = document.getElementById('modal-profile-description').value.trim();
   const industries = document.getElementById('modal-industries').value.trim();
+  const locations = document.getElementById('modal-locations').value
+    .split(',').map(s => s.trim()).filter(Boolean);
   const other = document.getElementById('modal-other-expectations').value.trim();
   const criteria = document.getElementById('modal-scoring-criteria').value.trim();
   const guide = document.getElementById('modal-scoring-guide').value.trim();
@@ -1201,6 +1207,7 @@ function updatePromptPreview() {
     `Desired roles: ${desiredRoles}.`,
   ];
   if (industries) parts.push('', 'Preferred industries:', '', industries);
+  if (locations.length > 0) parts.push('', 'Preferred locations:', '', locations.join(', '));
   if (other) parts.push('', other);
   parts.push(
     '',
