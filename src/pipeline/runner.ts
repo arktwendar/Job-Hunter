@@ -67,6 +67,7 @@ export function getRunStatus(profileId: number = 1) {
 export interface RunOptions {
   groupIds?: number[];    // if provided, only run these groups (by id)
   dateRange?: DateRange;  // defaults to '24h'
+  provider?: string;      // override scraping provider for this run
 }
 
 export interface PipelineResult {
@@ -127,7 +128,6 @@ export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled',
 
     // Resolve API keys: DB value takes priority, env vars are fallback
     const apifyToken = settings.apify_api_token || config.apifyApiToken;
-    const scrapingProvider = settings.scraping_provider || 'harvestapi';
     const openAiKey = settings.openai_api_key || config.openAiKey;
     const resendApiKey = settings.resend_api_key || config.resendApiKey;
     const emailFrom = settings.email_from || config.emailFrom;
@@ -142,13 +142,18 @@ export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled',
       .all(profileId) as BlacklistedCompanyRow[];
     const blacklistNames = new Set(blacklist.map((b) => b.company_name.toLowerCase().trim()));
 
-    const { groupIds, dateRange = '24h' } = options;
+    const { groupIds, dateRange = '24h', provider: providerOverride } = options;
+    // provider override (from Run Once modal) takes priority, then settings, then fallback
+    const scrapingProvider = providerOverride || settings.scraping_provider || 'harvestapi';
 
     console.log(`[runner] Starting pipeline (${trigger}) — ${groups.length} group(s), ${blacklist.length} blacklisted company(ies)`);
 
-    // Pre-compute active groups for progress tracking
+    // Pre-compute targeted groups for progress tracking.
+    // When groupIds are specified (e.g. schedule snapshot), run those IDs regardless of is_active —
+    // deleted groups are naturally absent from `groups` and will be silently skipped.
+    // When no groupIds, fall back to is_active filtering (manual runs).
     const activeGroups = groups.filter((g) =>
-      g.is_active && (!groupIds || groupIds.length === 0 || groupIds.includes(g.id))
+      groupIds && groupIds.length > 0 ? groupIds.includes(g.id) : g.is_active
     );
     const totalSections = activeGroups.length + 2; // Starting + one per active group + AI Scoring
     const sw = 100 / totalSections;
@@ -204,13 +209,19 @@ export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled',
 
     // --- Per-group loop ---
     for (const group of groups) {
-      if (!group.is_active) {
-        console.log(`[runner] Group ${group.id} is inactive, skipping.`);
-        continue;
-      }
-      if (groupIds && groupIds.length > 0 && !groupIds.includes(group.id)) {
-        console.log(`[runner] Group ${group.id} not in selected groupIds, skipping.`);
-        continue;
+      if (groupIds && groupIds.length > 0) {
+        // Running from a schedule snapshot (or explicit ID list): use IDs as-is, ignore is_active.
+        // Deleted groups are already absent from `groups`; deactivated ones intentionally run.
+        if (!groupIds.includes(group.id)) {
+          console.log(`[runner] Group ${group.id} not in selected groupIds, skipping.`);
+          continue;
+        }
+      } else {
+        // Manual run without groupIds: respect is_active
+        if (!group.is_active) {
+          console.log(`[runner] Group ${group.id} is inactive, skipping.`);
+          continue;
+        }
       }
 
       const keywords: string[] = JSON.parse(group.keywords);

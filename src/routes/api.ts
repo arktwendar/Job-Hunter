@@ -75,7 +75,10 @@ router.post('/run', async (req: Request, res: Response) => {
   if (b.dateRange === '7d') dateRange = '7d';
   else if (b.dateRange === 'month') dateRange = 'month';
 
-  const runOptions: RunOptions = { groupIds, dateRange };
+  // Parse optional provider override
+  const provider = (b.provider === 'harvestapi' || b.provider === 'valig') ? b.provider as string : undefined;
+
+  const runOptions: RunOptions = { groupIds, dateRange, provider };
 
   // Respond immediately, run in background
   res.json({ success: true, message: 'Pipeline started. Check dashboard for results.' });
@@ -243,7 +246,7 @@ router.get('/stats', (req: Request, res: Response) => {
 router.get('/schedule/status', (req: Request, res: Response) => {
   const db = getDb();
   const profileId = req.profile.id;
-  const settings = db.prepare('SELECT email_send_time, timezone, schedule_date_range, schedule_group_ids, cron_schedule FROM settings WHERE profile_id = ?').get(profileId) as Pick<SettingsRow, 'email_send_time' | 'timezone' | 'schedule_date_range' | 'schedule_group_ids' | 'cron_schedule'> | undefined;
+  const settings = db.prepare('SELECT email_send_time, timezone, schedule_date_range, schedule_group_ids, cron_schedule, scraping_provider FROM settings WHERE profile_id = ?').get(profileId) as Pick<SettingsRow, 'email_send_time' | 'timezone' | 'schedule_date_range' | 'schedule_group_ids' | 'cron_schedule' | 'scraping_provider'> | undefined;
   const savedGroupIds: number[] = settings?.schedule_group_ids ? JSON.parse(settings.schedule_group_ids) : [];
   const groups = db.prepare('SELECT id, group_name, is_active FROM search_groups WHERE profile_id = ? ORDER BY id ASC').all(profileId) as Array<{ id: number; group_name: string; is_active: number }>;
   res.json({
@@ -253,6 +256,7 @@ router.get('/schedule/status', (req: Request, res: Response) => {
     timezone: settings?.timezone || 'Asia/Yerevan',
     schedule_date_range: settings?.schedule_date_range || '24h',
     schedule_group_ids: savedGroupIds,
+    scraping_provider: settings?.scraping_provider || 'harvestapi',
     groups,
   });
 });
@@ -267,10 +271,17 @@ router.post('/schedule/start', async (req: Request, res: Response) => {
   const scheduleDateRange = (b.schedule_date_range === '7d' ? '7d' : '24h') as '24h' | '7d';
   // schedule_days: '*' for daily, or '1,3,5' etc. for specific days
   const scheduleDays = String(b.schedule_days || '*').trim().replace(/[^0-9,*]/g, '') || '*';
-  // group_ids: [] = all active
-  const groupIds: number[] = Array.isArray(b.group_ids)
+  // group_ids: snapshot the explicitly selected IDs; if none provided, snapshot currently active ones
+  let groupIds: number[] = Array.isArray(b.group_ids)
     ? (b.group_ids as unknown[]).map((id) => parseInt(String(id), 10)).filter((n) => !isNaN(n))
     : [];
+
+  // Always snapshot a concrete list so the schedule runs exactly those roles,
+  // regardless of future is_active changes.
+  if (groupIds.length === 0) {
+    const activeNow = db.prepare('SELECT id FROM search_groups WHERE profile_id = ? AND is_active = 1 ORDER BY id ASC').all(profileId) as Array<{ id: number }>;
+    groupIds = activeNow.map((g) => g.id);
+  }
 
   const updates: string[] = [];
   const params: unknown[] = [];
