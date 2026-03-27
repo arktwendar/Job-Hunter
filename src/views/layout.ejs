@@ -574,21 +574,38 @@
       document.getElementById('sched-freq-days')?.classList.toggle('hidden', freq !== 'custom');
     }
 
-    function renderSchedGroups(groups, savedGroupIds) {
+    function renderSchedGroups(groups) {
       const container = document.getElementById('sched-modal-groups');
       if (!groups || groups.length === 0) {
         container.innerHTML = '<span class="text-sm text-gray-400">No roles configured.</span>';
         return;
       }
-      const isAll = !savedGroupIds || savedGroupIds.length === 0;
-      container.innerHTML = groups.map(g => `
-        <label class="flex items-center gap-3 cursor-pointer py-1.5 hover:bg-gray-50 rounded-lg px-1">
-          <input type="checkbox" class="sched-group-check w-4 h-4 rounded accent-blue-600"
-                 value="${g.id}" ${isAll || savedGroupIds.includes(g.id) ? 'checked' : ''}>
-          <span class="text-sm text-gray-800 flex-1">${escHtml(g.group_name || 'Role #' + g.id)}</span>
-          ${!g.is_active ? '<span class="text-xs text-gray-400 italic">inactive</span>' : ''}
-        </label>
-      `).join('');
+      container.innerHTML = groups.map(g => {
+        const on = !!g.is_active;
+        return `
+          <div class="flex items-center justify-between py-2 px-1">
+            <span class="text-sm text-gray-800 flex-1">${escHtml(g.group_name || 'Role #' + g.id)}</span>
+            <label class="flex items-center cursor-pointer">
+              <input type="checkbox" class="sched-group-check sr-only" value="${g.id}"
+                     ${on ? 'checked' : ''} onchange="onSchedGroupToggle(this)" />
+              <div class="relative w-8 h-4 rounded-full transition-colors ${on ? 'bg-emerald-500' : 'bg-gray-300'}">
+                <div class="absolute top-0.5 ${on ? 'left-4' : 'left-0.5'} w-3 h-3 bg-white rounded-full shadow transition-all"></div>
+              </div>
+            </label>
+          </div>`;
+      }).join('');
+    }
+
+    function onSchedGroupToggle(checkbox) {
+      const track = checkbox.nextElementSibling;
+      const thumb = track.firstElementChild;
+      if (checkbox.checked) {
+        track.classList.replace('bg-gray-300', 'bg-emerald-500');
+        thumb.classList.replace('left-0.5', 'left-4');
+      } else {
+        track.classList.replace('bg-emerald-500', 'bg-gray-300');
+        thumb.classList.replace('left-4', 'left-0.5');
+      }
     }
 
     function openScheduleModal() {
@@ -617,8 +634,8 @@
           });
         }
 
-        // Render groups with saved selections
-        renderSchedGroups(data.groups || [], data.schedule_group_ids || []);
+        // Render groups using is_active state
+        renderSchedGroups(data.groups || []);
       }).catch(() => {
         setSchedDateRange('24h');
         setSchedFrequency('daily');
@@ -649,15 +666,27 @@
         scheduleDays = checked.sort((a, b) => parseInt(a) - parseInt(b)).join(',');
       }
 
-      // Collect selected group IDs
-      const groupChecks = document.querySelectorAll('.sched-group-check:checked');
-      const groupIds = Array.from(groupChecks).map(c => parseInt(c.value, 10));
+      // Collect all toggle states
+      const allSchedToggles = document.querySelectorAll('.sched-group-check');
+      const schedGroupStates = Array.from(allSchedToggles).map(c => ({
+        id: parseInt(c.value, 10),
+        is_active: c.checked,
+      }));
 
       btn.disabled = true;
       btn.textContent = 'Starting…';
       msgEl.classList.add('hidden');
 
       try {
+        // Sync is_active states with Settings and Run Once
+        await Promise.all(schedGroupStates.map(({ id, is_active }) =>
+          fetch('/api/groups/' + id, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ is_active }),
+          })
+        ));
+
         const res = await fetch('/api/schedule/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -666,7 +695,6 @@
             timezone,
             schedule_date_range: _schedDateRange,
             schedule_days: scheduleDays,
-            group_ids: groupIds,
           }),
         });
         const data = await res.json();

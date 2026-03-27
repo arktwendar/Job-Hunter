@@ -99,7 +99,7 @@ function formatDate(iso) {
         </span>
         <% } %>
         <% if (job.posted_date) { %>
-        <span>Posted <%= job.posted_date %></span>
+        <span>Posted <%= new Date(job.posted_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: tz }) %></span>
         <% } %>
         <span class="text-gray-400">Fetched <%= formatDate(job.fetched_at) %></span>
       </div>
