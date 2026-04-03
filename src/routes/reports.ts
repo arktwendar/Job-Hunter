@@ -7,6 +7,8 @@ import { getDb, type SearchRunRow, type RunJobLogRow, type SettingsRow } from '.
 
 const router = Router();
 
+// ---- Constants ----
+
 const VERDICT_PRIORITY: Record<string, number> = {
   STRONG_MATCH: 0,
   WEAK_MATCH: 1,
@@ -16,6 +18,18 @@ const VERDICT_PRIORITY: Record<string, number> = {
   FILTERED: 5,
 };
 
+// ---- Utilities ----
+
+function fmtDate(iso: string | null, timezone: string): { date: string; time: string } {
+  if (!iso) return { date: '—', time: '' };
+  const d = new Date(String(iso));
+  if (isNaN(d.getTime())) return { date: String(iso).slice(0, 10), time: '' };
+  return {
+    date: d.toLocaleDateString('en-CA', { timeZone: timezone }),
+    time: d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: timezone }),
+  };
+}
+
 function extractCountry(location: string | null): string {
   if (!location) return 'Remote / Unknown';
   const parts = location.split(',');
@@ -24,72 +38,163 @@ function extractCountry(location: string | null): string {
   return last;
 }
 
+// ---- Types ----
+
 interface JobLogWithInternalId extends RunJobLogRow {
   internal_job_id: number | null;
 }
 
-interface CountryGroup {
+export interface FormattedJob {
+  id: number;
+  run_id: number;
+  internal_job_id: number | null;
+  title: string;
+  company: string;
+  location: string | null;
   country: string;
-  jobs: JobLogWithInternalId[];
+  url: string | null;
+  ai_score: number | null;
+  ai_verdict: string;
+  rejection_category: string | null;
+  logged_date: string;
+  logged_time: string;
 }
 
-interface RunWithLogs extends SearchRunRow {
-  countryGroups: CountryGroup[];
-  blacklistedCount: number;
-  filteredCount: number;
+interface RunSummary extends SearchRunRow {
+  filtered_count: number;
+  blacklisted_count: number;
+  ran_at_date: string;
+  ran_at_time: string;
+  jobs: FormattedJob[];
+  preloaded: boolean;
 }
 
+// ---- Helpers ----
+
+function processJobs(logs: JobLogWithInternalId[], timezone: string): FormattedJob[] {
+  const jobs: FormattedJob[] = logs.map((log) => {
+    const { date, time } = fmtDate(log.logged_at, timezone);
+    return {
+      id: log.id,
+      run_id: log.run_id,
+      internal_job_id: log.internal_job_id,
+      title: log.title,
+      company: log.company,
+      location: log.location,
+      country: extractCountry(log.location),
+      url: log.url,
+      ai_score: log.ai_score,
+      ai_verdict: log.ai_verdict,
+      rejection_category: log.rejection_category,
+      logged_date: date,
+      logged_time: time,
+    };
+  });
+
+  jobs.sort((a, b) => {
+    const pa = VERDICT_PRIORITY[a.ai_verdict] ?? 99;
+    const pb = VERDICT_PRIORITY[b.ai_verdict] ?? 99;
+    if (pa !== pb) return pa - pb;
+    return (b.ai_score ?? -1) - (a.ai_score ?? -1);
+  });
+
+  return jobs;
+}
+
+function getTimezone(profileId: number): string {
+  const row = getDb()
+    .prepare('SELECT timezone FROM settings WHERE profile_id = ?')
+    .get(profileId) as Pick<SettingsRow, 'timezone'> | undefined;
+  return row?.timezone || 'UTC';
+}
+
+// ---- Routes ----
+
+// GET /reports — main page; preloads last 2 runs, stubs the rest for lazy-load
 router.get('/', (req: Request, res: Response) => {
   const db = getDb();
   const profileId = req.profile.id;
+  const timezone = getTimezone(profileId);
 
+  // Single query: run summaries + aggregate verdict counts (no N+1)
   const runs = db
-    .prepare(`SELECT * FROM search_runs WHERE profile_id = ? ORDER BY ran_at DESC LIMIT 30`)
-    .all(profileId) as SearchRunRow[];
+    .prepare<SearchRunRow & { filtered_count: number; blacklisted_count: number }>(
+      `SELECT sr.*,
+         (SELECT COUNT(*) FROM run_job_logs WHERE run_id = sr.id AND ai_verdict = 'FILTERED')   AS filtered_count,
+         (SELECT COUNT(*) FROM run_job_logs WHERE run_id = sr.id AND ai_verdict = 'BLACKLISTED') AS blacklisted_count
+       FROM search_runs sr
+       WHERE sr.profile_id = ?
+       ORDER BY sr.ran_at DESC
+       LIMIT 30`,
+    )
+    .all(profileId);
 
-  const runsWithLogs: RunWithLogs[] = runs.map((run) => {
+  // Batch-load logs for the first 2 runs in one query
+  const preloadIds = runs.slice(0, 2).map((r) => r.id);
+  const preloadedMap = new Map<number, FormattedJob[]>();
+
+  if (preloadIds.length > 0) {
+    const placeholders = preloadIds.map(() => '?').join(', ');
     const logs = db
-      .prepare(
-        `SELECT rjl.*, j.id as internal_job_id
+      .prepare<JobLogWithInternalId>(
+        `SELECT rjl.*, j.id AS internal_job_id
          FROM run_job_logs rjl
          LEFT JOIN jobs j ON j.linkedin_job_id = rjl.linkedin_job_id
-         WHERE rjl.run_id = ?
-         ORDER BY rjl.company ASC, rjl.logged_at ASC`,
+         WHERE rjl.run_id IN (${placeholders})`,
       )
-      .all(run.id) as JobLogWithInternalId[];
+      .all(...preloadIds);
 
-    const blacklistedCount = logs.filter((l) => l.ai_verdict === 'BLACKLISTED').length;
-    const filteredCount = logs.filter((l) => l.ai_verdict === 'FILTERED').length;
-
-    // Group by country, sort alphabetically with Remote/Unknown last
-    const countryMap = new Map<string, JobLogWithInternalId[]>();
+    // Group by run_id in one pass, then process+sort each group
+    const byRunId = new Map<number, JobLogWithInternalId[]>();
     for (const log of logs) {
-      const country = extractCountry(log.location);
-      if (!countryMap.has(country)) countryMap.set(country, []);
-      countryMap.get(country)!.push(log);
+      const bucket = byRunId.get(log.run_id) ?? [];
+      byRunId.set(log.run_id, bucket);
+      bucket.push(log);
     }
+    for (const runId of preloadIds) {
+      preloadedMap.set(runId, processJobs(byRunId.get(runId) ?? [], timezone));
+    }
+  }
 
-    const countryGroups: CountryGroup[] = Array.from(countryMap.entries())
-      .sort(([a], [b]) => {
-        if (a === 'Remote / Unknown') return 1;
-        if (b === 'Remote / Unknown') return -1;
-        return a.localeCompare(b);
-      })
-      .map(([country, jobs]) => ({
-        country,
-        jobs: jobs.slice().sort((a, b) => {
-          const pa = VERDICT_PRIORITY[a.ai_verdict] ?? 99;
-          const pb = VERDICT_PRIORITY[b.ai_verdict] ?? 99;
-          if (pa !== pb) return pa - pb;
-          return (b.ai_score ?? -1) - (a.ai_score ?? -1);
-        }),
-      }));
-
-    return { ...run, countryGroups, blacklistedCount, filteredCount };
+  const runSummaries: RunSummary[] = runs.map((run, i) => {
+    const { date, time } = fmtDate(run.ran_at, timezone);
+    return {
+      ...run,
+      ran_at_date: date,
+      ran_at_time: time,
+      jobs: preloadedMap.get(run.id) ?? [],
+      preloaded: i < 2,
+    };
   });
 
-  const rSettings = db.prepare('SELECT timezone FROM settings WHERE profile_id = ?').get(req.profile.id) as Pick<SettingsRow, 'timezone'> | undefined;
-  res.render('reports', { runs: runsWithLogs, timezone: rSettings?.timezone || 'UTC', title: 'Run Logs' });
+  res.render('reports', { runs: runSummaries, title: 'Run Logs' });
+});
+
+// GET /reports/runs/:id/logs — JSON fragment for lazy-load
+router.get('/runs/:id/logs', (req: Request, res: Response) => {
+  const runId = parseInt(req.params.id, 10);
+  if (isNaN(runId)) { res.status(400).json({ error: 'Invalid run id' }); return; }
+
+  const db = getDb();
+  const profileId = req.profile.id;
+
+  const run = db
+    .prepare('SELECT id FROM search_runs WHERE id = ? AND profile_id = ?')
+    .get(runId, profileId);
+  if (!run) { res.status(404).json({ error: 'Not found' }); return; }
+
+  const timezone = getTimezone(profileId);
+
+  const logs = db
+    .prepare<JobLogWithInternalId>(
+      `SELECT rjl.*, j.id AS internal_job_id
+       FROM run_job_logs rjl
+       LEFT JOIN jobs j ON j.linkedin_job_id = rjl.linkedin_job_id
+       WHERE rjl.run_id = ?`,
+    )
+    .all(runId);
+
+  res.json({ jobs: processJobs(logs, timezone) });
 });
 
 export { router as reportsRouter };

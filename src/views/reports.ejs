@@ -1,12 +1,20 @@
 <%
-const tz = timezone || 'UTC';
-function fmtDate(iso) {
-  if (!iso) return { date: '—', time: '' };
-  const d = new Date(String(iso));
-  if (isNaN(d.getTime())) return { date: String(iso).slice(0, 10), time: '' };
-  const date = d.toLocaleDateString('en-CA', { timeZone: tz });
-  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: tz });
-  return { date, time };
+// Server-side helpers
+
+function verdictChip(verdict, rejectionCategory) {
+  const base = 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap';
+  if (verdict === 'STRONG_MATCH') return `<span class="${base} bg-emerald-50 text-emerald-700">✅ Strong fit</span>`;
+  if (verdict === 'WEAK_MATCH')   return `<span class="${base} bg-yellow-50 text-yellow-700">⚠️ Weak fit</span>`;
+  if (verdict === 'BLACKLISTED')  return `<span class="${base} bg-gray-100 text-gray-600">🚫 Blacklisted</span>`;
+  if (verdict === 'DUPLICATE')    return `<span class="${base} bg-purple-50 text-purple-600">🔁 Duplicate</span>`;
+  if (verdict === 'FILTERED')     return `<span class="${base} bg-slate-100 text-slate-500">✂ Filtered</span>`;
+  if (verdict === 'NO_MATCH') {
+    if (rejectionCategory === 'NO_VISA')           return `<span class="${base} bg-red-50 text-red-600">❌ No visa support</span>`;
+    if (rejectionCategory === 'LANGUAGE_MISMATCH') return `<span class="${base} bg-red-50 text-red-600">❌ Language mismatch</span>`;
+    if (rejectionCategory === 'PROFILE_MISMATCH')  return `<span class="${base} bg-red-50 text-red-600">❌ Profile mismatch</span>`;
+    return `<span class="${base} bg-red-50 text-red-600">❌ No fit</span>`;
+  }
+  return '';
 }
 
 function statusBadge(status) {
@@ -21,27 +29,9 @@ function statusLabel(status) {
   return status;
 }
 
-function verdictChip(verdict, rejectionCategory) {
-  if (verdict === 'STRONG_MATCH')
-    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 whitespace-nowrap">✅ Strong fit</span>';
-  if (verdict === 'WEAK_MATCH')
-    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700 whitespace-nowrap">⚠️ Weak fit</span>';
-  if (verdict === 'BLACKLISTED')
-    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 whitespace-nowrap">🚫 Blacklisted</span>';
-  if (verdict === 'DUPLICATE')
-    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-600 whitespace-nowrap">🔁 Duplicate</span>';
-  if (verdict === 'FILTERED')
-    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500 whitespace-nowrap">✂ Filtered</span>';
-  if (verdict === 'NO_MATCH') {
-    if (rejectionCategory === 'NO_VISA')
-      return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 whitespace-nowrap">❌ No visa support</span>';
-    if (rejectionCategory === 'LANGUAGE_MISMATCH')
-      return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 whitespace-nowrap">❌ Language mismatch</span>';
-    if (rejectionCategory === 'PROFILE_MISMATCH')
-      return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 whitespace-nowrap">❌ Profile mismatch</span>';
-    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 whitespace-nowrap">❌ No fit</span>';
-  }
-  return '';
+function scoreClass(score) {
+  if (score == null) return 'text-gray-400';
+  return score >= 71 ? 'text-emerald-600 font-semibold' : score >= 51 ? 'text-yellow-600 font-semibold' : 'text-red-500';
 }
 %>
 
@@ -68,12 +58,12 @@ function verdictChip(verdict, rejectionCategory) {
 <% } else { %>
 
 <div class="space-y-3">
-<% runs.forEach(run => {
-  const dt = fmtDate(run.ran_at);
-  const totalJobs = run.countryGroups.reduce((s, g) => s + g.jobs.length, 0);
-%>
+<% runs.forEach(run => { %>
 
-<details class="group bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+<details class="group bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
+         data-run-id="<%= run.id %>"
+         <%= run.preloaded ? 'data-preloaded' : '' %>>
+
   <summary class="flex items-center justify-between px-5 py-4 cursor-pointer select-none list-none hover:bg-gray-50 transition-colors">
     <div class="flex items-center gap-3 flex-wrap min-w-0">
       <!-- Expand/collapse chevron -->
@@ -83,9 +73,9 @@ function verdictChip(verdict, rejectionCategory) {
 
       <!-- Date & time -->
       <div class="flex items-center gap-2">
-        <span class="font-semibold text-gray-900 text-sm"><%= dt.date %></span>
+        <span class="font-semibold text-gray-900 text-sm"><%= run.ran_at_date %></span>
         <span class="text-gray-400 text-xs">·</span>
-        <span class="text-gray-500 text-sm"><%= dt.time %> GMT+4</span>
+        <span class="text-gray-500 text-sm"><%= run.ran_at_time %></span>
       </div>
 
       <!-- Status badge -->
@@ -107,10 +97,9 @@ function verdictChip(verdict, rejectionCategory) {
         · <span class="font-medium text-yellow-600"><%= run.jobs_weak_match %></span> weak
         · <span class="font-medium text-red-500"><%= run.jobs_no_match %></span> no match
         · <span class="font-medium text-purple-600"><%= run.jobs_duplicate %></span> duplicates
-        <% if (run.filteredCount > 0) { %>· <span class="font-medium text-slate-500"><%= run.filteredCount %></span> filtered<% } %>
-        <% if (run.blacklistedCount > 0) { %>· <span class="font-medium text-gray-500"><%= run.blacklistedCount %></span> blacklisted<% } %>
+        <% if (run.filtered_count > 0) { %>· <span class="font-medium text-slate-500"><%= run.filtered_count %></span> filtered<% } %>
+        <% if (run.blacklisted_count > 0) { %>· <span class="font-medium text-gray-500"><%= run.blacklisted_count %></span> blacklisted<% } %>
       </span>
-      <span class="text-xs text-gray-400"><%= totalJobs %> logged</span>
 
       <!-- Cost button -->
       <% if (run.cost_openai_usd != null || run.cost_apify_usd != null) { %>
@@ -160,115 +149,46 @@ function verdictChip(verdict, rejectionCategory) {
     </div>
     <% } %>
 
-    <% if (run.countryGroups.length === 0) { %>
-    <div class="px-5 py-8 text-center text-sm text-gray-400">
-      No job logs for this run.
-      <% if (run.status === 'running') { %>
-      <span class="block mt-1 text-xs">Run is still in progress.</span>
-      <% } %>
-    </div>
-    <% } else { %>
-
-    <%
-    const flatJobs = [];
-    run.countryGroups.forEach(function(g) { flatJobs.push.apply(flatJobs, g.jobs); });
-    flatJobs.sort(function(a, b) {
-      const sa = a.ai_score, sb = b.ai_score;
-      if (sa != null && sb != null) return sb - sa;
-      if (sa != null) return -1;
-      if (sb != null) return 1;
-      const vp = { DUPLICATE: 0, BLACKLISTED: 1, FILTERED: 2 };
-      return (vp[a.ai_verdict] || 99) - (vp[b.ai_verdict] || 99);
-    });
-    %>
-
-    <!-- Flat view: sorted by score (default) -->
-    <div class="run-flat-view">
-      <table class="hidden md:table w-full">
-        <tbody class="divide-y divide-gray-50">
-          <% flatJobs.forEach(function(job) { %>
-          <tr class="hover:bg-gray-50 transition-colors">
-            <td class="px-5 py-2.5 text-sm text-gray-600 whitespace-nowrap w-0 max-w-[200px] truncate"><%= job.company %></td>
-            <td class="px-3 py-2.5 text-sm text-gray-900">
-              <% if (job.internal_job_id) { %>
-                <a href="/job/<%= job.internal_job_id %>" class="hover:text-blue-600 transition-colors"><%= job.title %></a>
-              <% } else { %>
-                <%= job.title %>
-              <% } %>
-              <% if (job.location) { %><span class="block text-xs text-gray-400 truncate"><%= job.location %></span><% } %>
-            </td>
-            <td class="pl-3 py-2.5 w-0 whitespace-nowrap text-right">
-              <span onclick="showJobMenu(event,this)" data-internal-id="<%= job.internal_job_id || '' %>" data-url="<%= job.url || '' %>" data-log-id="<%= job.id %>" data-verdict="<%= job.ai_verdict %>" class="cursor-pointer">
-                <%- verdictChip(job.ai_verdict, job.rejection_category) %>
-              </span>
-            </td>
-            <td class="py-2.5 px-1 w-0 whitespace-nowrap text-right" style="min-width:2.25rem;">
-              <% if (job.ai_score != null) { %><span class="text-xs <%= job.ai_score >= 71 ? 'text-emerald-600 font-semibold' : job.ai_score >= 51 ? 'text-yellow-600 font-semibold' : 'text-red-500' %>"><%= job.ai_score %></span><% } %>
-            </td>
-            <td class="pl-2 pr-5 py-2.5 w-0 whitespace-nowrap">
-              <% if (job.url) { %>
-                <a href="<%= job.url %>" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:underline text-xs">link</a>
-              <% } else { %>
-                <span class="text-gray-300 text-xs">—</span>
-              <% } %>
-            </td>
-          </tr>
-          <% }); %>
-        </tbody>
-      </table>
-      <div class="md:hidden divide-y divide-gray-50">
-        <% flatJobs.forEach(function(job) { %>
-        <% const target = job.internal_job_id ? '/job/' + job.internal_job_id : (job.url || null); %>
-        <div class="px-4 py-3 hover:bg-gray-50 transition-colors<%= target ? ' cursor-pointer' : '' %>"
-             <% if (target) { %>onclick="location.href='<%= target %>'"<% } %>>
-          <div class="flex items-center justify-between gap-2 mb-0.5">
-            <span class="text-sm font-medium text-gray-700 truncate"><%= job.company %></span>
-            <div class="flex items-center gap-1.5 flex-shrink-0">
-              <span onclick="showJobMenu(event,this)" data-internal-id="<%= job.internal_job_id || '' %>" data-url="<%= job.url || '' %>" data-log-id="<%= job.id %>" data-verdict="<%= job.ai_verdict %>" class="cursor-pointer">
-                <%- verdictChip(job.ai_verdict, job.rejection_category) %>
-              </span>
-              <span class="text-xs text-right" style="min-width:1.75rem;display:inline-block;"><% if (job.ai_score != null) { %><span class="<%= job.ai_score >= 71 ? 'text-emerald-600 font-semibold' : job.ai_score >= 51 ? 'text-yellow-600 font-semibold' : 'text-red-500' %>"><%= job.ai_score %></span><% } %></span>
-            </div>
-          </div>
-          <p class="text-xs text-gray-500 truncate"><%= job.title %></p>
-          <% if (job.location) { %><p class="text-xs text-gray-400 truncate mt-0.5"><%= job.location %></p><% } %>
+    <!-- Jobs container: server-rendered for preloaded runs, lazy for the rest -->
+    <div class="run-jobs-container">
+      <% if (run.preloaded) { %>
+        <% if (run.jobs.length === 0) { %>
+        <div class="px-5 py-8 text-center text-sm text-gray-400">
+          No job logs for this run.
+          <% if (run.status === 'running') { %><span class="block mt-1 text-xs">Run is still in progress.</span><% } %>
         </div>
-        <% }); %>
-      </div>
-    </div>
+        <% } else { %>
 
-    <!-- Location view: split by country (hidden by default) -->
-    <div class="run-location-view hidden">
-      <% run.countryGroups.forEach(function(group) { %>
-      <div>
-        <div class="px-5 py-2.5 bg-gray-50 border-b border-gray-100 sticky top-0">
-          <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide"><%= group.country %></h3>
-        </div>
+        <!-- Desktop table -->
         <table class="hidden md:table w-full">
           <tbody class="divide-y divide-gray-50">
-            <% group.jobs.forEach(function(job) {
-              const jdt = fmtDate(job.logged_at);
-            %>
-            <tr class="hover:bg-gray-50 transition-colors">
+            <% run.jobs.forEach(function(job, idx) { %>
+            <tr data-row-idx="<%= idx %>" data-country="<%= job.country %>" class="hover:bg-gray-50 transition-colors">
               <td class="px-5 py-2.5 text-xs text-gray-400 whitespace-nowrap w-0">
-                <span class="block"><%= jdt.date %></span>
-                <span class="block text-gray-300"><%= jdt.time %></span>
+                <span class="block"><%= job.logged_date %></span>
+                <span class="block text-gray-300"><%= job.logged_time %></span>
               </td>
-              <td class="px-3 py-2.5 text-sm text-gray-600 whitespace-nowrap w-0 max-w-[180px] truncate"><%= job.company %></td>
+              <td class="px-3 py-2.5 text-sm text-gray-600 whitespace-nowrap w-0 max-w-[160px] truncate"><%= job.company %></td>
               <td class="px-3 py-2.5 text-sm text-gray-900">
                 <% if (job.internal_job_id) { %>
                   <a href="/job/<%= job.internal_job_id %>" class="hover:text-blue-600 transition-colors"><%= job.title %></a>
                 <% } else { %>
                   <%= job.title %>
                 <% } %>
+                <% if (job.location) { %><span class="block text-xs text-gray-400 truncate"><%= job.location %></span><% } %>
               </td>
               <td class="pl-3 py-2.5 w-0 whitespace-nowrap text-right">
-                <span onclick="showJobMenu(event,this)" data-internal-id="<%= job.internal_job_id || '' %>" data-url="<%= job.url || '' %>" data-log-id="<%= job.id %>" data-verdict="<%= job.ai_verdict %>" class="cursor-pointer">
+                <span onclick="showJobMenu(event,this)"
+                      data-internal-id="<%= job.internal_job_id || '' %>"
+                      data-url="<%= job.url || '' %>"
+                      data-log-id="<%= job.id %>"
+                      data-verdict="<%= job.ai_verdict %>"
+                      class="cursor-pointer">
                   <%- verdictChip(job.ai_verdict, job.rejection_category) %>
                 </span>
               </td>
               <td class="py-2.5 px-1 w-0 whitespace-nowrap text-right" style="min-width:2.25rem;">
-                <% if (job.ai_score != null) { %><span class="text-xs <%= job.ai_score >= 71 ? 'text-emerald-600 font-semibold' : job.ai_score >= 51 ? 'text-yellow-600 font-semibold' : 'text-red-500' %>"><%= job.ai_score %></span><% } %>
+                <% if (job.ai_score != null) { %><span class="text-xs <%= scoreClass(job.ai_score) %>"><%= job.ai_score %></span><% } %>
               </td>
               <td class="pl-2 pr-5 py-2.5 w-0 whitespace-nowrap">
                 <% if (job.url) { %>
@@ -281,29 +201,40 @@ function verdictChip(verdict, rejectionCategory) {
             <% }); %>
           </tbody>
         </table>
-        <div class="md:hidden divide-y divide-gray-50">
-          <% group.jobs.forEach(function(job) { %>
+
+        <!-- Mobile list -->
+        <div class="md:hidden jobs-mobile-list divide-y divide-gray-50">
+          <% run.jobs.forEach(function(job, idx) { %>
           <% const target = job.internal_job_id ? '/job/' + job.internal_job_id : (job.url || null); %>
-          <div class="px-4 py-3 hover:bg-gray-50 transition-colors<%= target ? ' cursor-pointer' : '' %>"
-               <% if (target) { %>onclick="location.href='<%= target %>'"<% } %>>
+          <div class="job-mobile-row px-4 py-3 hover:bg-gray-50 transition-colors<%= target ? ' cursor-pointer' : '' %>"
+               data-row-idx="<%= idx %>"
+               data-country="<%= job.country %>"
+               <% if (target) { %>data-href="<%= target %>" onclick="location.href=this.dataset.href"<% } %>>
             <div class="flex items-center justify-between gap-2 mb-0.5">
               <span class="text-sm font-medium text-gray-700 truncate"><%= job.company %></span>
               <div class="flex items-center gap-1.5 flex-shrink-0">
-                <span onclick="showJobMenu(event,this)" data-internal-id="<%= job.internal_job_id || '' %>" data-url="<%= job.url || '' %>" data-log-id="<%= job.id %>" data-verdict="<%= job.ai_verdict %>" class="cursor-pointer">
+                <span onclick="showJobMenu(event,this)"
+                      data-internal-id="<%= job.internal_job_id || '' %>"
+                      data-url="<%= job.url || '' %>"
+                      data-log-id="<%= job.id %>"
+                      data-verdict="<%= job.ai_verdict %>"
+                      class="cursor-pointer">
                   <%- verdictChip(job.ai_verdict, job.rejection_category) %>
                 </span>
-                <span class="text-xs text-right" style="min-width:1.75rem;display:inline-block;"><% if (job.ai_score != null) { %><span class="<%= job.ai_score >= 71 ? 'text-emerald-600 font-semibold' : job.ai_score >= 51 ? 'text-yellow-600 font-semibold' : 'text-red-500' %>"><%= job.ai_score %></span><% } %></span>
+                <% if (job.ai_score != null) { %><span class="text-xs <%= scoreClass(job.ai_score) %>" style="min-width:1.75rem;display:inline-block;text-align:right;"><%= job.ai_score %></span><% } %>
               </div>
             </div>
             <p class="text-xs text-gray-500 truncate"><%= job.title %></p>
+            <% if (job.location) { %><p class="text-xs text-gray-400 truncate mt-0.5"><%= job.location %></p><% } %>
+            <p class="text-xs text-gray-300 mt-0.5"><%= job.logged_date %> · <%= job.logged_time %></p>
           </div>
           <% }); %>
         </div>
-      </div>
-      <% }); %>
-    </div>
 
-    <% } %>
+        <% } %>
+      <% } %>
+      <!-- Lazy runs: container is empty; JS fills it on first expand -->
+    </div>
 
     <!-- Run footer -->
     <div class="px-5 py-2.5 border-t border-gray-100 text-xs text-gray-400 flex items-center justify-between">
@@ -333,6 +264,230 @@ function verdictChip(verdict, rejectionCategory) {
 </div>
 
 <script>
+// ---- Utilities ----
+
+function escHtml(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function scoreClass(score) {
+  if (score == null) return 'text-gray-400';
+  return score >= 71 ? 'text-emerald-600 font-semibold' : score >= 51 ? 'text-yellow-600 font-semibold' : 'text-red-500';
+}
+
+function logVerdictChip(verdict, rejectionCategory) {
+  const base = 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap';
+  if (verdict === 'STRONG_MATCH') return '<span class="' + base + ' bg-emerald-50 text-emerald-700">\u2705 Strong fit</span>';
+  if (verdict === 'WEAK_MATCH')   return '<span class="' + base + ' bg-yellow-50 text-yellow-700">\u26a0\ufe0f Weak fit</span>';
+  if (verdict === 'BLACKLISTED')  return '<span class="' + base + ' bg-gray-100 text-gray-600">\uD83D\uDEAB Blacklisted</span>';
+  if (verdict === 'DUPLICATE')    return '<span class="' + base + ' bg-purple-50 text-purple-600">\uD83D\uDD01 Duplicate</span>';
+  if (verdict === 'FILTERED')     return '<span class="' + base + ' bg-slate-100 text-slate-500">\u2702 Filtered</span>';
+  if (verdict === 'NO_MATCH') {
+    if (rejectionCategory === 'NO_VISA')           return '<span class="' + base + ' bg-red-50 text-red-600">\u274c No visa support</span>';
+    if (rejectionCategory === 'LANGUAGE_MISMATCH') return '<span class="' + base + ' bg-red-50 text-red-600">\u274c Language mismatch</span>';
+    if (rejectionCategory === 'PROFILE_MISMATCH')  return '<span class="' + base + ' bg-red-50 text-red-600">\u274c Profile mismatch</span>';
+    return '<span class="' + base + ' bg-red-50 text-red-600">\u274c No fit</span>';
+  }
+  return '';
+}
+
+// ---- Build jobs HTML from JSON (used by lazy-load) ----
+
+function buildJobsHTML(jobs) {
+  if (!jobs || jobs.length === 0) {
+    return '<div class="px-5 py-8 text-center text-sm text-gray-400">No job logs for this run.</div>';
+  }
+
+  let tableRows = '';
+  let mobileRows = '';
+
+  jobs.forEach(function(job, idx) {
+    const sc = scoreClass(job.ai_score);
+    const target = job.internal_job_id ? '/job/' + job.internal_job_id : (job.url || null);
+
+    tableRows += '<tr data-row-idx="' + idx + '" data-country="' + escHtml(job.country) + '" class="hover:bg-gray-50 transition-colors">'
+      + '<td class="px-5 py-2.5 text-xs text-gray-400 whitespace-nowrap w-0">'
+      + '<span class="block">' + escHtml(job.logged_date) + '</span>'
+      + '<span class="block text-gray-300">' + escHtml(job.logged_time) + '</span>'
+      + '</td>'
+      + '<td class="px-3 py-2.5 text-sm text-gray-600 whitespace-nowrap w-0 max-w-[160px] truncate">' + escHtml(job.company) + '</td>'
+      + '<td class="px-3 py-2.5 text-sm text-gray-900">'
+      + (job.internal_job_id
+          ? '<a href="/job/' + job.internal_job_id + '" class="hover:text-blue-600 transition-colors">' + escHtml(job.title) + '</a>'
+          : escHtml(job.title))
+      + (job.location ? '<span class="block text-xs text-gray-400 truncate">' + escHtml(job.location) + '</span>' : '')
+      + '</td>'
+      + '<td class="pl-3 py-2.5 w-0 whitespace-nowrap text-right">'
+      + '<span onclick="showJobMenu(event,this)"'
+      + ' data-internal-id="' + (job.internal_job_id || '') + '"'
+      + ' data-url="' + escHtml(job.url || '') + '"'
+      + ' data-log-id="' + job.id + '"'
+      + ' data-verdict="' + job.ai_verdict + '"'
+      + ' class="cursor-pointer">'
+      + logVerdictChip(job.ai_verdict, job.rejection_category)
+      + '</span></td>'
+      + '<td class="py-2.5 px-1 w-0 whitespace-nowrap text-right" style="min-width:2.25rem;">'
+      + (job.ai_score != null ? '<span class="text-xs ' + sc + '">' + job.ai_score + '</span>' : '')
+      + '</td>'
+      + '<td class="pl-2 pr-5 py-2.5 w-0 whitespace-nowrap">'
+      + (job.url
+          ? '<a href="' + escHtml(job.url) + '" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:underline text-xs">link</a>'
+          : '<span class="text-gray-300 text-xs">\u2014</span>')
+      + '</td>'
+      + '</tr>';
+
+    mobileRows += '<div class="job-mobile-row px-4 py-3 hover:bg-gray-50 transition-colors' + (target ? ' cursor-pointer' : '') + '"'
+      + ' data-row-idx="' + idx + '"'
+      + ' data-country="' + escHtml(job.country) + '"'
+      + (target ? ' data-href="' + escHtml(target) + '" onclick="location.href=this.dataset.href"' : '')
+      + '>'
+      + '<div class="flex items-center justify-between gap-2 mb-0.5">'
+      + '<span class="text-sm font-medium text-gray-700 truncate">' + escHtml(job.company) + '</span>'
+      + '<div class="flex items-center gap-1.5 flex-shrink-0">'
+      + '<span onclick="showJobMenu(event,this)"'
+      + ' data-internal-id="' + (job.internal_job_id || '') + '"'
+      + ' data-url="' + escHtml(job.url || '') + '"'
+      + ' data-log-id="' + job.id + '"'
+      + ' data-verdict="' + job.ai_verdict + '"'
+      + ' class="cursor-pointer">'
+      + logVerdictChip(job.ai_verdict, job.rejection_category)
+      + '</span>'
+      + (job.ai_score != null ? '<span class="text-xs ' + sc + '" style="min-width:1.75rem;display:inline-block;text-align:right;">' + job.ai_score + '</span>' : '')
+      + '</div></div>'
+      + '<p class="text-xs text-gray-500 truncate">' + escHtml(job.title) + '</p>'
+      + (job.location ? '<p class="text-xs text-gray-400 truncate mt-0.5">' + escHtml(job.location) + '</p>' : '')
+      + '<p class="text-xs text-gray-300 mt-0.5">' + escHtml(job.logged_date) + ' \u00b7 ' + escHtml(job.logged_time) + '</p>'
+      + '</div>';
+  });
+
+  return '<table class="hidden md:table w-full"><tbody class="divide-y divide-gray-50">' + tableRows + '</tbody></table>'
+       + '<div class="md:hidden jobs-mobile-list divide-y divide-gray-50">' + mobileRows + '</div>';
+}
+
+// ---- Lazy-load ----
+
+async function loadRunLogs(runId, detailsEl) {
+  const container = detailsEl.querySelector('.run-jobs-container');
+  if (!container) return;
+  container.innerHTML = '<div class="px-5 py-8 text-center text-sm text-gray-400">Loading\u2026</div>';
+  try {
+    const res = await fetch('/reports/runs/' + runId + '/logs');
+    const data = await res.json();
+    container.innerHTML = buildJobsHTML(data.jobs);
+    if (isSplitEnabled) applySplitToDetailsEl(detailsEl, true);
+  } catch (_) {
+    container.innerHTML = '<div class="px-5 py-8 text-center text-sm text-red-400">Failed to load logs.</div>';
+  }
+}
+
+// Attach toggle listeners to lazy runs
+document.querySelectorAll('details[data-run-id]:not([data-preloaded])').forEach(function(details) {
+  details.addEventListener('toggle', async function() {
+    if (!this.open || this.dataset.loaded) return;
+    this.dataset.loaded = '1';
+    await loadRunLogs(this.dataset.runId, this);
+  });
+});
+
+// ---- Location split ----
+
+function buildCountryGroups(rows) {
+  const map = new Map();
+  rows.forEach(function(row) {
+    const c = row.dataset.country || 'Remote / Unknown';
+    if (!map.has(c)) map.set(c, []);
+    map.get(c).push(row);
+  });
+  return Array.from(map.entries()).sort(function([a], [b]) {
+    if (a === 'Remote / Unknown') return 1;
+    if (b === 'Remote / Unknown') return -1;
+    return a.localeCompare(b);
+  });
+}
+
+function applyLocationSplitToTbody(tbody) {
+  tbody.querySelectorAll('.country-header').forEach(function(el) { el.remove(); });
+  const groups = buildCountryGroups(Array.from(tbody.querySelectorAll('tr[data-row-idx]')));
+  groups.forEach(function([country, rows]) {
+    const hdr = document.createElement('tr');
+    hdr.className = 'country-header';
+    hdr.innerHTML = `<td colspan="6" class="px-5 py-2 bg-gray-50 border-y border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wide">${escHtml(country)}</td>`;
+    tbody.appendChild(hdr);
+    rows.forEach(function(r) { tbody.appendChild(r); });
+  });
+}
+
+function restoreFlatOrderToTbody(tbody) {
+  tbody.querySelectorAll('.country-header').forEach(function(el) { el.remove(); });
+  const rows = Array.from(tbody.querySelectorAll('tr[data-row-idx]'));
+  rows.sort(function(a, b) { return +a.dataset.rowIdx - +b.dataset.rowIdx; });
+  rows.forEach(function(r) { tbody.appendChild(r); });
+}
+
+function applyLocationSplitToMobileList(list) {
+  list.querySelectorAll('.country-header').forEach(function(el) { el.remove(); });
+  const groups = buildCountryGroups(Array.from(list.querySelectorAll('[data-row-idx]')));
+  groups.forEach(function([country, rows]) {
+    const hdr = document.createElement('div');
+    hdr.className = 'country-header px-4 py-2 bg-gray-50 border-y border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wide';
+    hdr.textContent = country;
+    list.appendChild(hdr);
+    rows.forEach(function(r) { list.appendChild(r); });
+  });
+}
+
+function restoreFlatOrderToMobileList(list) {
+  list.querySelectorAll('.country-header').forEach(function(el) { el.remove(); });
+  const rows = Array.from(list.querySelectorAll('[data-row-idx]'));
+  rows.sort(function(a, b) { return +a.dataset.rowIdx - +b.dataset.rowIdx; });
+  rows.forEach(function(r) { list.appendChild(r); });
+}
+
+function applySplitToDetailsEl(detailsEl, split) {
+  const tbody = detailsEl.querySelector('tbody');
+  const mobileList = detailsEl.querySelector('.jobs-mobile-list');
+  if (tbody)      { split ? applyLocationSplitToTbody(tbody)      : restoreFlatOrderToTbody(tbody); }
+  if (mobileList) { split ? applyLocationSplitToMobileList(mobileList) : restoreFlatOrderToMobileList(mobileList); }
+}
+
+let isSplitEnabled = false;
+
+function toggleLocationSplit(checked) {
+  isSplitEnabled = checked;
+  document.querySelectorAll('details[data-run-id]').forEach(function(detailsEl) {
+    // Only touch runs that are already loaded
+    if (detailsEl.hasAttribute('data-preloaded') || detailsEl.dataset.loaded) {
+      applySplitToDetailsEl(detailsEl, checked);
+    }
+  });
+  localStorage.setItem('runLogsSplitByLocation', checked ? '1' : '0');
+}
+
+// Restore split preference on load
+(function() {
+  if (localStorage.getItem('runLogsSplitByLocation') === '1') {
+    const cb = document.getElementById('location-split-checkbox');
+    if (cb) { cb.checked = true; toggleLocationSplit(true); }
+  }
+})();
+
+// ---- Cost popups ----
+
+function toggleCostPopup(runId) {
+  const popup = document.getElementById('cost-popup-' + runId);
+  const btn = popup.previousElementSibling;
+  const isHidden = popup.classList.contains('hidden');
+  document.querySelectorAll('[id^="cost-popup-"]').forEach(function(el) { el.classList.add('hidden'); });
+  if (isHidden) {
+    const rect = btn.getBoundingClientRect();
+    popup.style.top  = (rect.bottom + 4) + 'px';
+    popup.style.right = (window.innerWidth - rect.right) + 'px';
+    popup.classList.remove('hidden');
+  }
+}
+
+// ---- Job context menu ----
+
 let _menuTargetEl = null;
 
 function showJobMenu(event, el) {
@@ -342,36 +497,19 @@ function showJobMenu(event, el) {
   const url = el.dataset.url;
   const menu = document.getElementById('job-menu');
   const viewLink = document.getElementById('job-menu-view');
-  const extLink = document.getElementById('job-menu-link');
+  const extLink  = document.getElementById('job-menu-link');
 
-  if (internalId) {
-    viewLink.href = '/job/' + internalId;
-    viewLink.classList.remove('hidden');
-  } else {
-    viewLink.classList.add('hidden');
-  }
-  if (url) {
-    extLink.href = url;
-    extLink.classList.remove('hidden');
-  } else {
-    extLink.classList.add('hidden');
-  }
+  if (internalId) { viewLink.href = '/job/' + internalId; viewLink.classList.remove('hidden'); }
+  else            { viewLink.classList.add('hidden'); }
 
-  document.querySelectorAll('[id^="cost-popup-"]').forEach(el => el.classList.add('hidden'));
+  if (url) { extLink.href = url; extLink.classList.remove('hidden'); }
+  else     { extLink.classList.add('hidden'); }
+
+  document.querySelectorAll('[id^="cost-popup-"]').forEach(function(el) { el.classList.add('hidden'); });
   const rect = el.getBoundingClientRect();
-  menu.style.top = (rect.bottom + 4) + 'px';
+  menu.style.top  = (rect.bottom + 4) + 'px';
   menu.style.left = Math.min(rect.left, window.innerWidth - 172) + 'px';
   menu.classList.remove('hidden');
-}
-
-function verdictChipStatic(verdict) {
-  if (verdict === 'STRONG_MATCH') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 whitespace-nowrap">✅ Strong fit</span>';
-  if (verdict === 'WEAK_MATCH')   return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700 whitespace-nowrap">⚠️ Weak fit</span>';
-  if (verdict === 'NO_MATCH')     return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 whitespace-nowrap">❌ No fit</span>';
-  if (verdict === 'DUPLICATE')    return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-600 whitespace-nowrap">🔁 Duplicate</span>';
-  if (verdict === 'BLACKLISTED')  return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 whitespace-nowrap">🚫 Blacklisted</span>';
-  if (verdict === 'FILTERED')     return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500 whitespace-nowrap">✂ Filtered</span>';
-  return verdict;
 }
 
 async function menuSetVerdict(newVerdict) {
@@ -386,17 +524,13 @@ async function menuSetVerdict(newVerdict) {
   if (!confirm('Change verdict to "' + (labels[newVerdict] || newVerdict) + '"?')) return;
 
   const internalId = el.dataset.internalId;
-  const logId = el.dataset.logId;
-  const endpoint = internalId
+  const logId      = el.dataset.logId;
+  const endpoint   = internalId
     ? '/api/jobs/' + internalId + '/verdict'
     : '/api/run-log/' + logId + '/verdict';
 
   try {
-    const res = await fetch(endpoint, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ verdict: newVerdict }),
-    });
+    const res  = await fetch(endpoint, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ verdict: newVerdict }) });
     const data = await res.json();
     if (data.success) {
       el.dataset.verdict = newVerdict;
@@ -404,42 +538,17 @@ async function menuSetVerdict(newVerdict) {
         el.dataset.internalId = String(data.internal_job_id);
         document.getElementById('job-menu-view').href = '/job/' + data.internal_job_id;
       }
-      el.innerHTML = verdictChipStatic(newVerdict);
+      el.innerHTML = logVerdictChip(newVerdict, null);
     } else {
       alert(data.error || 'Failed to update verdict');
     }
-  } catch (e) {
+  } catch (_) {
     alert('Could not reach the server.');
   }
 }
 
-function toggleLocationSplit(checked) {
-  document.querySelectorAll('.run-flat-view').forEach(el => el.classList.toggle('hidden', checked));
-  document.querySelectorAll('.run-location-view').forEach(el => el.classList.toggle('hidden', !checked));
-  localStorage.setItem('runLogsSplitByLocation', checked ? '1' : '0');
-}
-
-(function() {
-  if (localStorage.getItem('runLogsSplitByLocation') === '1') {
-    const cb = document.getElementById('location-split-checkbox');
-    if (cb) { cb.checked = true; toggleLocationSplit(true); }
-  }
-})();
-
-function toggleCostPopup(runId) {
-  const popup = document.getElementById('cost-popup-' + runId);
-  const btn = popup.previousElementSibling;
-  const isHidden = popup.classList.contains('hidden');
-  document.querySelectorAll('[id^="cost-popup-"]').forEach(el => el.classList.add('hidden'));
-  if (isHidden) {
-    const rect = btn.getBoundingClientRect();
-    popup.style.top = (rect.bottom + 4) + 'px';
-    popup.style.right = (window.innerWidth - rect.right) + 'px';
-    popup.classList.remove('hidden');
-  }
-}
-document.addEventListener('click', () => {
-  document.querySelectorAll('[id^="cost-popup-"]').forEach(el => el.classList.add('hidden'));
+document.addEventListener('click', function() {
+  document.querySelectorAll('[id^="cost-popup-"]').forEach(function(el) { el.classList.add('hidden'); });
   document.getElementById('job-menu').classList.add('hidden');
 });
 </script>
