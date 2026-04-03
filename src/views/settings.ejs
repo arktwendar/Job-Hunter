@@ -261,6 +261,16 @@ For summary: if score is >70 —</pre>
 
             <div class="space-y-1.5">
 
+              <!-- Segment 0: pre-filter system prompt (fixed) -->
+              <div>
+                <div class="flex items-center gap-2 mb-1.5">
+                  <p class="text-xs font-medium text-gray-600">Pre-filter system prompt</p>
+                  <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 bg-gray-100 rounded px-1.5 py-0.5">Fixed</span>
+                  <span class="text-xs text-gray-400">— titles-only pass to narrow candidates before full dedup</span>
+                </div>
+                <pre class="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 py-2.5 text-xs text-gray-500 font-mono whitespace-pre-wrap leading-relaxed">You are a job deduplication pre-filter. Given a new job title and a list of existing job titles from the same company, return the IDs of any existing jobs that could plausibly be the same role — same seniority, same domain, same scope. Be liberal: include anything that might be a duplicate. Return only the IDs.</pre>
+              </div>
+
               <!-- Segment 1: dedup_system_prompt (editable) -->
               <div>
                 <div class="flex items-center gap-2 mb-1.5">
