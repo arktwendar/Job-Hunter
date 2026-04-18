@@ -144,9 +144,8 @@ router.get('/history', (req: Request, res: Response) => {
     params.push(`%${company}%`);
   }
   if (country) {
-    // Match jobs where the last comma-segment of location equals the chosen country
-    conditions.push('(j.location LIKE ? OR j.location = ?)');
-    params.push(`%, ${country}`, country);
+    conditions.push('j.country = ?');
+    params.push(country);
   }
   if (scoreMin !== null) { conditions.push('j.ai_score >= ?'); params.push(scoreMin); }
   if (scoreMax !== null) { conditions.push('j.ai_score <= ?'); params.push(scoreMax); }
@@ -178,16 +177,11 @@ router.get('/history', (req: Request, res: Response) => {
   const groups = db.prepare('SELECT id, group_name FROM search_groups WHERE profile_id = ? ORDER BY id ASC').all(profileId) as Pick<SearchGroupRow, 'id' | 'group_name'>[];
   const histSettings = db.prepare('SELECT timezone FROM settings WHERE profile_id = ?').get(profileId) as Pick<SettingsRow, 'timezone'> | undefined;
 
-  // Distinct countries for dropdown: last comma-segment of location
-  const locationRows = db.prepare(
-    `SELECT DISTINCT location FROM jobs WHERE profile_id = ? AND location IS NOT NULL AND location != '' ORDER BY location ASC`,
-  ).all(profileId) as Array<{ location: string }>;
-  const countrySet = new Set<string>();
-  for (const row of locationRows) {
-    const parts = row.location.split(',').map((s: string) => s.trim()).filter(Boolean);
-    if (parts.length > 0) countrySet.add(parts[parts.length - 1]);
-  }
-  const countries = Array.from(countrySet).sort();
+  // Distinct countries for dropdown — resolved by locationNormalizer
+  const countryRows = db.prepare(
+    `SELECT DISTINCT country FROM jobs WHERE profile_id = ? AND country IS NOT NULL AND country != '' ORDER BY country ASC`,
+  ).all(profileId) as Array<{ country: string }>;
+  const countries = countryRows.map(r => r.country);
 
   res.render('history', {
     jobs,

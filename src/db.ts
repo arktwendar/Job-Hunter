@@ -653,6 +653,50 @@ function runMigrations(db: Database): void {
     console.warn('[db] Migration v24 (idx_jobs_match_fetch) failed (non-fatal):', (err as Error).message);
   }
 
+  // v25: add country column to jobs + location_country cache table
+  try {
+    const cols = db.prepare(`PRAGMA table_info(jobs)`).all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === 'country')) {
+      db.exec(`ALTER TABLE jobs ADD COLUMN country TEXT`);
+      // Backfill country from last comma-segment of location (best-effort, covers structured strings)
+      db.exec(`
+        UPDATE jobs SET country = TRIM(
+          CASE
+            WHEN location LIKE '%,%' THEN SUBSTR(location, INSTR(location, ',') + 1 +
+              CASE WHEN INSTR(SUBSTR(location, INSTR(location, ',') + 1), ',') > 0
+                   THEN LENGTH(location) - LENGTH(REPLACE(location, ',', '')) - 1
+                   ELSE 0
+              END)
+            ELSE location
+          END
+        )
+        WHERE location IS NOT NULL AND location != ''
+      `);
+      console.log('[db] Migration v25: jobs.country column added');
+    }
+  } catch (err) {
+    console.warn('[db] Migration v25 (jobs.country) failed (non-fatal):', (err as Error).message);
+  }
+
+  // v25: seed hardcoded regional labels into location_country cache
+  try {
+    const hardcoded: Array<[string, string]> = [
+      ['EMEA', 'EMEA'],
+      ['DACH', 'DACH'],
+      ['European Union', 'European Union'],
+      ['European Economic Area', 'European Economic Area'],
+    ];
+    const upsert = db.prepare(
+      `INSERT OR IGNORE INTO location_country (location, country, created_at) VALUES (?, ?, ?)`,
+    );
+    const now = new Date().toISOString();
+    for (const [loc, country] of hardcoded) {
+      upsert.run(loc, country, now);
+    }
+  } catch (err) {
+    console.warn('[db] Migration v25 (location_country seed) failed (non-fatal):', (err as Error).message);
+  }
+
   // v8: seed default search group from settings row if groups table is empty
   try {
     const groupCount = (
@@ -778,6 +822,12 @@ function initSchema(db: Database): void {
       notes        TEXT    NOT NULL DEFAULT '',
       created_at   TEXT    NOT NULL,
       UNIQUE (profile_id, company_name)
+    );
+
+    CREATE TABLE IF NOT EXISTS location_country (
+      location   TEXT PRIMARY KEY,
+      country    TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS company_notes (
@@ -948,6 +998,7 @@ export interface JobRow {
   provider: string;
   original_ai_verdict: string | null;
   cv_assessment: string | null;
+  country: string | null;
 }
 
 export interface SearchRunRow {

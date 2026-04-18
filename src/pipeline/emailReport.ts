@@ -233,6 +233,7 @@ export async function sendTestEmail(recipientEmail: string, resendApiKey: string
       provider: 'harvestapi',
       original_ai_verdict: 'STRONG_MATCH',
       cv_assessment: null,
+      country: 'United Kingdom',
     },
   ];
 

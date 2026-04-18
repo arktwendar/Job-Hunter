@@ -11,6 +11,7 @@ import { config } from '../config';
 import { fetchJobs, type JobPosting, type DateRange } from './fetcher';
 import { filterNewJobs } from './deduplicator';
 import { scoreJobs, dedupAndSummarise, preFilterDuplicateCandidates, buildScoringSystemPrompt, type ScoredJob, type ExistingJob } from './aiScorer';
+import { resolveCountries } from './locationNormalizer';
 import { sendDailyReport, type RunStats } from './emailReport';
 
 // Price per 1M tokens in USD — sorted longest key first so prefix matching is unambiguous
@@ -184,11 +185,11 @@ export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled',
     // Prepared statements (shared across groups)
     const insertJob = db.prepare(`
       INSERT OR IGNORE INTO jobs (
-        profile_id, linkedin_job_id, title, company, location, work_mode, description,
+        profile_id, linkedin_job_id, title, company, location, country, work_mode, description,
         url, posted_date, fetched_at, ai_score, ai_rationale, ai_summary, ai_verdict,
         is_duplicate, duplicate_of_job_id, seen, seen_at, group_id, rejection_category,
         apply_url, provider, original_ai_verdict
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const updateApplyUrl = db.prepare(`
@@ -206,13 +207,6 @@ export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled',
     // In-memory dedup set — prevents re-scoring the same linkedin_job_id within a single run
     // (NO_MATCH jobs are never written to DB, so filterNewJobs alone can't catch within-run dupes)
     const seenInRunJobIds = new Set<string>();
-
-    // Tracks strong matches already claimed this run by company+title (lowercased+trimmed).
-    // Catches jobs that LinkedIn lists under multiple different IDs for the same posting —
-    // they bypass linkedin_job_id dedup but would be missed by semantic dedup because
-    // the first copy isn't stored yet when the second one's Call 2 query runs.
-    // Persists across groups so cross-group same-run duplicates are also caught.
-    const seenStrongInRun = new Set<string>();
 
     // In-run semantic dedup context: maps lowercase+trimmed company name → accepted STRONG_MATCH
     // jobs from this run (not yet in DB). Prepended to DB results for dedupAndSummarise so the
@@ -382,65 +376,57 @@ export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled',
         let summary: string | null = null;
 
         if (scored.verdict === 'STRONG_MATCH') {
-          const runKey = `${scored.job.company.toLowerCase().trim()}|||${scored.job.title.toLowerCase().trim()}`;
           const companyKey = scored.job.company.toLowerCase().trim();
 
-          if (seenStrongInRun.has(runKey)) {
-            // Exact company+title match already accepted this run — instant duplicate, no AI call.
-            isDuplicate = true;
-            console.log(`[runner] In-run duplicate: "${scored.job.title}" at "${scored.job.company}" (different LinkedIn ID, same posting)`);
-          } else {
-            // Stage 1: gather all same-company saved jobs (any verdict, no title filter)
-            const inRunEntries = strongMatchesInRun.get(companyKey) ?? [];
-            // Assign temporary negative IDs to in-run entries (not yet in DB)
-            const inRunWithIds: ExistingJob[] = inRunEntries.map((e, i) => ({ ...e, id: -(i + 1) }));
-            const dbCandidates = db.prepare(`
-              SELECT id, title, description FROM jobs
-              WHERE lower(company) = lower(?) AND is_duplicate = 0
-              ORDER BY fetched_at DESC
-            `).all(scored.job.company) as ExistingJob[];
-            const allCandidates: ExistingJob[] = [...inRunWithIds, ...dbCandidates];
+          // Stage 1: gather all same-company saved jobs (any verdict, no title filter)
+          const inRunEntries = strongMatchesInRun.get(companyKey) ?? [];
+          // Assign temporary negative IDs to in-run entries (not yet in DB)
+          const inRunWithIds: ExistingJob[] = inRunEntries.map((e, i) => ({ ...e, id: -(i + 1) }));
+          const dbCandidates = db.prepare(`
+            SELECT id, title, description FROM jobs
+            WHERE lower(company) = lower(?) AND is_duplicate = 0
+            ORDER BY fetched_at DESC
+          `).all(scored.job.company) as ExistingJob[];
+          const allCandidates: ExistingJob[] = [...inRunWithIds, ...dbCandidates];
 
-            if (allCandidates.length > 0) {
-              // Stage 2: cheap titles-only pre-filter → returns plausible duplicate IDs
-              const filteredIds = await preFilterDuplicateCandidates(
-                scored.job.title,
-                allCandidates.map((c) => ({ id: c.id, title: c.title })),
-                settings.ai_model,
-                openAiKey,
-              );
+          if (allCandidates.length > 0) {
+            // Stage 2: cheap titles-only pre-filter → returns plausible duplicate IDs
+            const filteredIds = await preFilterDuplicateCandidates(
+              scored.job.title,
+              allCandidates.map((c) => ({ id: c.id, title: c.title })),
+              settings.ai_model,
+              openAiKey,
+            );
 
-              if (filteredIds.length > 0) {
-                // Resolve IDs back to full entries, cap at 5
-                const filteredSet = new Set(filteredIds);
-                const dedupCandidates = allCandidates
-                  .filter((c) => filteredSet.has(c.id))
-                  .slice(0, 5);
+            if (filteredIds.length > 0) {
+              // Resolve IDs back to full entries, cap at 5
+              const filteredSet = new Set(filteredIds);
+              const dedupCandidates = allCandidates
+                .filter((c) => filteredSet.has(c.id))
+                .slice(0, 5);
 
-                if (dedupCandidates.length > 0) {
-                  // Stage 3: full dedup with descriptions
-                  const dedup = await dedupAndSummarise(scored, dedupCandidates, settings, openAiKey);
-                  isDuplicate = dedup.isDuplicate;
-                  duplicateOfId = dedup.duplicateOfId && dedup.duplicateOfId > 0 ? dedup.duplicateOfId : null;
-                  totalInputTokens += dedup.tokenUsage.inputTokens;
-                  totalCachedInputTokens += dedup.tokenUsage.cachedInputTokens;
-                  totalOutputTokens += dedup.tokenUsage.outputTokens;
-                  if (isDuplicate) {
-                    console.log(`[runner] Semantic duplicate: "${scored.job.title}" at "${scored.job.company}" → original ID ${duplicateOfId}`);
-                  }
+              if (dedupCandidates.length > 0) {
+                // Stage 3: full dedup with descriptions
+                const dedup = await dedupAndSummarise(scored, dedupCandidates, settings, openAiKey);
+                isDuplicate = dedup.isDuplicate;
+                duplicateOfId = dedup.duplicateOfId && dedup.duplicateOfId > 0 ? dedup.duplicateOfId : null;
+                totalInputTokens += dedup.tokenUsage.inputTokens;
+                totalCachedInputTokens += dedup.tokenUsage.cachedInputTokens;
+                totalOutputTokens += dedup.tokenUsage.outputTokens;
+                if (isDuplicate) {
+                  console.log(`[runner] Semantic duplicate: "${scored.job.title}" at "${scored.job.company}" → original ID ${duplicateOfId}`);
                 }
               }
-              // filteredIds empty → pre-filter found no plausible duplicates; skip full dedup
             }
-            // allCandidates empty → first job from this company; skip both stages
+            // filteredIds empty → pre-filter found no plausible duplicates; skip full dedup
+          }
+          // allCandidates empty → first job from this company; skip both stages
 
-            if (!isDuplicate) {
-              seenStrongInRun.add(runKey);
-              // Register in in-run map so subsequent same-company jobs can be compared against it.
-              const entry: ExistingJob = { id: 0, title: scored.job.title, description: scored.job.description || '' };
-              strongMatchesInRun.set(companyKey, [...(strongMatchesInRun.get(companyKey) ?? []), entry]);
-              summary = scored.summary;  // from Call 1
-            }
+          if (!isDuplicate) {
+            // Register in in-run map so subsequent same-company jobs can be compared against it.
+            const entry: ExistingJob = { id: 0, title: scored.job.title, description: scored.job.description || '' };
+            strongMatchesInRun.set(companyKey, [...(strongMatchesInRun.get(companyKey) ?? []), entry]);
+            summary = scored.summary;  // from Call 1
           }
         }
 
@@ -477,14 +463,22 @@ export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled',
         }
       });
 
+      // Resolve country for all jobs in this group (cache-first, Nominatim fallback)
+      const allLocations = [
+        ...blacklistedJobs.map(j => j.location).filter(Boolean) as string[],
+        ...jobResults.map(r => r.scored.job.location).filter(Boolean) as string[],
+      ];
+      const countryMap = await resolveCountries(allLocations);
+
       // Store blacklisted jobs in jobs table (INSERT OR IGNORE — first encounter wins)
       if (blacklistedJobs.length > 0) {
         const now = new Date().toISOString();
         db.transaction(() => {
           for (const job of blacklistedJobs) {
+            const country = job.location ? (countryMap.get(job.location) ?? null) : null;
             insertJob.run(
               profileId, job.jobId, job.title, job.company,
-              job.location || null, job.workMode || null, job.description || '',
+              job.location || null, country, job.workMode || null, job.description || '',
               job.url || null, job.postedDate || null, now,
               0, null, null, 'BLACKLISTED',
               0, null, 0, null,
@@ -503,9 +497,10 @@ export async function runPipeline(trigger: 'scheduled' | 'manual' = 'scheduled',
         db.transaction(() => {
           for (const { scored, isDuplicate, duplicateOfId, summary } of jobResults) {
             const { job } = scored;
+            const country = job.location ? (countryMap.get(job.location) ?? null) : null;
             insertJob.run(
               profileId, job.jobId, job.title, job.company,
-              job.location || null, job.workMode || null, job.description || '',
+              job.location || null, country, job.workMode || null, job.description || '',
               job.url || null, job.postedDate || null, now,
               scored.score, scored.rationale || null,
               summary || null,
