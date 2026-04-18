@@ -658,20 +658,6 @@ function runMigrations(db: Database): void {
     const cols = db.prepare(`PRAGMA table_info(jobs)`).all() as Array<{ name: string }>;
     if (!cols.some((c) => c.name === 'country')) {
       db.exec(`ALTER TABLE jobs ADD COLUMN country TEXT`);
-      // Backfill country from last comma-segment of location (best-effort, covers structured strings)
-      db.exec(`
-        UPDATE jobs SET country = TRIM(
-          CASE
-            WHEN location LIKE '%,%' THEN SUBSTR(location, INSTR(location, ',') + 1 +
-              CASE WHEN INSTR(SUBSTR(location, INSTR(location, ',') + 1), ',') > 0
-                   THEN LENGTH(location) - LENGTH(REPLACE(location, ',', '')) - 1
-                   ELSE 0
-              END)
-            ELSE location
-          END
-        )
-        WHERE location IS NOT NULL AND location != ''
-      `);
       console.log('[db] Migration v25: jobs.country column added');
     }
   } catch (err) {
